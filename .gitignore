@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+
+# Xcode（.xcodeproj は project.yml から XcodeGen で生成するためコミットしない）
+*.xcodeproj
+xcuserdata/
+DerivedData/
+build/
+
+# SwiftPM
+.build/
+.swiftpm/
+
+# 個人ごとの設定（署名 ID の上書きなど。Config/Base.xcconfig から任意で include する）
+Config/Local.xcconfig
+
+# XcodeGen が project.yml の info.properties から生成する Info.plist
+App/Info.plist
+Spikes/EventTapSpike/Info.plist
+Spikes/OverlaySpike/Info.plist
+
+# Claude Code の設定・計画・メモ（ローカル専用）
+.claude/

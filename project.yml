@@ -1,0 +1,70 @@
+# XcodeGen の定義（design.md 15.1）。Tobi.xcodeproj は生成物なのでコミットしない。
+# 変更後は `xcodegen generate` を実行する。
+name: Tobi
+options:
+  bundleIdPrefix: io.github.hatohato25 # Q-27
+  deploymentTarget:
+    macOS: "27.0"
+  createIntermediateGroups: true
+configFiles:
+  # 署名 ID（CODE_SIGN_IDENTITY）と Local.xcconfig の取り込みはここ（D-26）
+  Debug: Config/Base.xcconfig
+  Release: Config/Base.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "27.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+packages:
+  TobiCore:
+    path: Packages/TobiCore
+targets:
+  Tobi:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+        excludes:
+          - "**/.gitkeep"
+    dependencies:
+      - package: TobiCore
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: $(TOBI_DISPLAY_NAME)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        LSUIElement: true # Dock と ⌘Tab に出さない（N-2.1）
+        LSApplicationCategoryType: public.app-category.utilities
+        NSHumanReadableCopyright: "Copyright © 2026 Tobi contributors. MIT License."
+    settings:
+      base:
+        PRODUCT_NAME: Tobi
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.hatohato25.tobi
+        # Info.plist は XcodeGen が info.properties から生成するため、INFOPLIST_KEY_* は効かない。
+        # 表示名は独自の設定値を経由して Info.plist に渡す。
+        TOBI_DISPLAY_NAME: Tobi
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1
+        ENABLE_HARDENED_RUNTIME: YES # 公証はしないが有効にしておく（D-26）
+        ENABLE_APP_SANDBOX: NO # AX API とイベントタップのため（C-1）。entitlements ファイルは作らない（D-25）
+        CODE_SIGN_STYLE: Manual # 署名 ID は Config/Base.xcconfig（D-26）
+        DEVELOPMENT_TEAM: ""
+        PROVISIONING_PROFILE_SPECIFIER: ""
+        SWIFT_STRICT_CONCURRENCY: complete
+        DEAD_CODE_STRIPPING: YES
+      configs:
+        Debug:
+          # インストール済みのリリース版と、アクセシビリティの許可・UserDefaults を分ける（D-27）
+          PRODUCT_BUNDLE_IDENTIFIER: io.github.hatohato25.tobi.debug
+          TOBI_DISPLAY_NAME: Tobi Debug
+schemes:
+  Tobi:
+    build:
+      targets:
+        Tobi: all
+    run:
+      config: Debug
+    archive:
+      config: Release

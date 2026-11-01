@@ -1,0 +1,11 @@
+// Tobi の共通ビルド設定（Debug / Release の両方に適用。project.yml の configFiles で指定）
+//
+// 署名は自己署名証明書「Tobi Self-Signed」で行う（design.md 11、16.1、D-26）。
+// ad-hoc 署名（"-"）だとビルドごとに cdhash が変わり、アクセシビリティの許可（TCC）が外れるため使わない。
+// 証明書がキーチェーンにない場合は、ad-hoc 署名に切り替わらず、ビルドが署名エラーで止まる。
+
+CODE_SIGN_IDENTITY = Tobi Self-Signed
+
+// 証明書を持たないコントリビューターは、Config/Local.xcconfig（git 管理外）で自分の証明書名に上書きする。
+// 雛形は Config/Local.xcconfig.example。ファイルがなければ何もしない（`#include?`）。
+#include? "Local.xcconfig"

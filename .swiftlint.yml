@@ -1,0 +1,97 @@
+# SwiftLint の設定
+#
+# 役割分担:
+# - 整形（インデント・空白・改行・括弧の位置・末尾カンマ）は swift-format（.swift-format）に任せる。
+# - SwiftLint は型安全・禁止事項（force_cast / force_try / force_unwrapping / print など）と、
+#   コードの質（複雑度・長さ・命名・冗長な書き方）の検査に使う。
+# `swiftlint lint --strict` で実行するため、warning もすべて失敗になる。
+
+included:
+  - App
+  - Packages
+
+excluded:
+  - .build
+  - "**/.build"
+  - Spikes
+  - "*.xcodeproj"
+  - build
+  - DerivedData
+
+disabled_rules:
+  # --- swift-format と衝突するルール ---
+  # swift-format は複数行の配列・辞書の最後の要素に末尾カンマを付ける（multiElementCollectionTrailingCommas）。
+  # trailing_comma は末尾カンマを禁止するため、整形のたびに違反になる。
+  - trailing_comma
+  # 条件や引数が複数行に折り返されたときの `{` の位置は swift-format が決める。
+  # opening_brace の期待する位置と食い違うことがあるため無効にする。
+  - opening_brace
+  # swift-format は折り返した引数を `(` に揃えずインデントで並べるため、揃えを求めるこのルールと衝突する。
+  - vertical_parameter_alignment
+
+  # --- swift-format が整形するため重複するルール ---
+  # 以下はインデント・空白・改行の系統。swift-format が書き換え、`swift format lint --strict` で検査するので、
+  # SwiftLint で二重に検査しない（設定値の食い違いによる衝突を防ぐ）。
+  - closing_brace
+  - colon
+  - comma
+  - leading_whitespace
+  - return_arrow_whitespace
+  - statement_position
+  - switch_case_alignment
+  - trailing_newline
+  - trailing_whitespace
+  - vertical_whitespace
+
+opt_in_rules:
+  # 型安全（CLAUDE.md「型安全を維持」）。force_cast / force_try は既定で有効。
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+  # 暗黙のフォールバックの温床になる書き方
+  - redundant_nil_coalescing
+  - fatal_error_message
+  # コードの質
+  - contains_over_filter_count
+  - contains_over_filter_is_empty
+  - contains_over_first_not_nil
+  - empty_collection_literal
+  - empty_count
+  - empty_string
+  - first_where
+  - identical_operands
+  - last_where
+  - sorted_first_last
+  - toggle_bool
+  - unowned_variable_capture
+  - yoda_condition
+
+# 既定は warning。--strict で実行するため、実質すべて失敗扱いになる。
+force_cast: error
+force_try: error
+force_unwrapping: error
+
+# 行の長さは swift-format の lineLength（120）と揃える。
+# コードは swift-format が折り返すため、実際に検出されるのはコメントと文字列リテラル。
+line_length:
+  warning: 120
+  ignores_urls: true
+
+# 座標（x, y）やループ変数など、短くても意味が明確な名前を許可する。
+identifier_name:
+  excluded:
+    - x
+    - y
+    - id
+    - i
+    - j
+
+custom_rules:
+  # ログは os.Logger を使う（CLAUDE.md「エラーハンドリング」）。print 系はユーザーの入力や要素のテキストを
+  # 標準出力に残す恐れがあるため禁止する。
+  no_print:
+    name: "print 系の禁止"
+    regex: '\b(print|debugPrint|NSLog)\s*\('
+    match_kinds:
+      - identifier
+    message: "print / debugPrint / NSLog は使わず、os.Logger を使ってください"
+    severity: error
