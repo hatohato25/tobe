@@ -6,6 +6,12 @@
 
 CODE_SIGN_IDENTITY = Tobi Self-Signed
 
+// Debug ビルドで実行ファイルを「起動用の小さな本体」と `<名前>.debug.dylib` に分けない（Xcode のプレビュー用の仕組み）。
+// Hardened Runtime のライブラリ検証は、読み込む dylib が本体と同じ Team ID で署名されていることを求める。
+// 自己署名証明書には Team ID がないため、分けると dyld が「different Team IDs」で起動直後に終了させる。
+// プレビューは使わないので、分けない設定にする（ライブラリ検証を無効にする entitlement は使わない。D-25）。
+ENABLE_DEBUG_DYLIB = NO
+
 // 証明書を持たないコントリビューターは、Config/Local.xcconfig（git 管理外）で自分の証明書名に上書きする。
 // 雛形は Config/Local.xcconfig.example。ファイルがなければ何もしない（`#include?`）。
 #include? "Local.xcconfig"
