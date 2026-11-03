@@ -20,6 +20,10 @@ private enum TapLifecycle {
     case idle
     case starting(generation: UInt64)
     case running(generation: UInt64, resources: TapPortBox)
+
+    var isRunning: Bool {
+        if case .running = self { true } else { false }
+    }
 }
 
 /// `TapContext` の `Mutex` で守る状態（design.md 7.1）。
@@ -27,9 +31,20 @@ private struct TapSharedState {
     var lifecycle: TapLifecycle = .idle
     var lastGeneration: UInt64 = 0
     var detector: ModifierTapDetector
+    /// keyDown / keyUp を渡すか破棄するかの判定と、破棄した keyDown の記録（design.md 7.3）。
+    /// タップの再有効化や作り直しでは捨てない。破棄した keyDown の keyUp を引き続き破棄するため（design.md 7.4）。
+    var tracker = KeySuppressionTracker()
     /// キー破棄（F-7）が ON か。ON はタップのスレッドが単独タップの検出時に立てる（D-8）。
-    /// OFF は MainActor（`KeySuppressionGate`、T34）と `stop()`。
+    /// OFF は MainActor（`setSuppressing(false)`）と `stop()`。
     var isSuppressing = false
+}
+
+/// `TapContext.setSuppressing(_:)` の結果（ログのため）。
+private enum SuppressionChange {
+    case changed
+    case unchanged
+    /// タップがないので ON を受け付けなかった。
+    case rejectedWithoutTap
 }
 
 /// タップのコールバックに渡す文脈。タップのスレッドと MainActor の両方から触る状態を `Mutex` で守る。
@@ -42,10 +57,17 @@ private struct TapSharedState {
 final class TapContext: Sendable {
     private let state: Mutex<TapSharedState>
     private let continuation: AsyncStream<TapEvent>.Continuation
+    #if DEBUG
+        /// Debug の起動引数 `--tap-hook`（`EventTapDebugHooks`）。起動時に 1 回だけ読む。
+        private let debugTapHook: EventTapDebugHooks.TapHook?
+    #endif
 
     init(triggerKey: TriggerKey, continuation: AsyncStream<TapEvent>.Continuation) {
         state = Mutex(TapSharedState(detector: ModifierTapDetector(triggerKey: triggerKey)))
         self.continuation = continuation
+        #if DEBUG
+            debugTapHook = EventTapDebugHooks.options.tapHook
+        #endif
     }
 
     // MARK: - 寿命（EventTapController / EventTapThread から呼ぶ）
@@ -157,6 +179,47 @@ final class TapContext: Sendable {
         continuation.finish()
     }
 
+    // MARK: - MainActor から呼ぶ操作（design.md 13 章）
+
+    /// キー破棄を切り替える（`KeySuppressionGate`）。
+    ///
+    /// OFF は Coordinator がヒントモードを抜けるときに呼ぶ。ON は通常、タップのスレッドが単独タップの検出時に
+    /// 自分で立てている（D-8）ので、ここでの ON は 2 回目の ON になる（design.md 5.2）。
+    /// タップが動いていない（作成中を含む）ときの ON は受け付けない。ON のまま次のタップを作ると、作った直後からキーを破棄して
+    /// キーボードが効かなくなるため（N-3.4。`stop()` が OFF にするのと同じ理由）。
+    func setSuppressing(_ suppressing: Bool) {
+        let change: SuppressionChange = state.withLock { shared in
+            if suppressing, !shared.lifecycle.isRunning {
+                return .rejectedWithoutTap
+            }
+            guard shared.isSuppressing != suppressing else { return .unchanged }
+            shared.isSuppressing = suppressing
+            return .changed
+        }
+        switch change {
+        case .changed:
+            Log.hotkey.info("キー破棄を \(suppressing ? "ON" : "OFF", privacy: .public) にした")
+        case .unchanged:
+            break
+        case .rejectedWithoutTap:
+            Log.hotkey.notice("イベントタップがないため、キー破棄の ON を受け付けなかった")
+        }
+    }
+
+    /// 起動キーを変える（S-1。設定の変更、Debug の `--trigger-key`）。
+    /// `ModifierTapDetector.triggerKey` の `didSet` が判定の途中状態を捨てる（T19）。
+    func updateTriggerKey(_ triggerKey: TriggerKey) {
+        let previous = state.withLock { shared in
+            let previous = shared.detector.triggerKey
+            shared.detector.triggerKey = triggerKey
+            return previous
+        }
+        guard previous != triggerKey else { return }
+        Log.hotkey.notice(
+            "起動キーを変更した: \(previous.rawValue, privacy: .public) → \(triggerKey.rawValue, privacy: .public)"
+        )
+    }
+
     // MARK: - コールバック（タップのスレッド）
 
     /// コールバックの本体。重い処理はせず、判定はロックの中で短く済ませる（design.md 7.2）。
@@ -176,22 +239,58 @@ final class TapContext: Sendable {
             // 修飾キーの変化は破棄しない（F-7.3）。起動キーの押下・解放もアプリに届く（spec 4.4）
             return .pass
         case .keyDown:
-            // 起動キーの押下中の keyDown（⌘C など）で単独タップの候補から外す（F-1.3）。
-            // キー破棄（KeySuppressionTracker）と .hintKey の通知は T34 が足す
-            state.withLock { shared in
-                _ = shared.detector.handle(.keyDown(at: now))
+            return handleKeyDown(event: event, at: now)
+        case .keyUp:
+            let keyCode = Self.keyCode(of: event)
+            // isSuppressing は判定に使われない（ヒントモードの終了後に届いた keyUp も、破棄した keyDown のものなら破棄する）
+            return state.withLock { shared in
+                shared.tracker.disposition(for: .keyUp, keyCode: keyCode, isSuppressing: shared.isSuppressing)
             }
-            return .pass
-        case .keyUp, .leftMouseDown, .rightMouseDown, .otherMouseDown:
-            // T34 が足す（keyUp の破棄、マウス押下による判定の取り消しと通知。TobiEventMarker の除外を含む）
+        case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+            handlePointerDown(event: event, at: now)
+            // クリックは破棄しない（暫定 Q-10: クリックでヒントモードを抜け、クリック自体はアプリに届ける）
             return .pass
         default:
             return .pass
         }
     }
 
+    private static func keyCode(of event: CGEvent) -> UInt16 {
+        UInt16(truncatingIfNeeded: event.getIntegerValueField(.keyboardEventKeycode))
+    }
+
+    /// keyDown を design.md 7.3 の規則で渡すか破棄するかを決め、破棄したら `.hintKey` を送る（F-4、F-7）。
+    /// 文字への変換はしない。MainActor の `KeyTranslator` が行う（design.md 7.6、T35）。
+    private func handleKeyDown(event: CGEvent, at now: Timestamp) -> KeySuppressionTracker.Disposition {
+        let keyCode = Self.keyCode(of: event)
+        let disposition = state.withLock { shared in
+            // 起動キーの押下中の keyDown（⌘C など）で単独タップの候補から外す（F-1.3）
+            _ = shared.detector.handle(.keyDown(at: now))
+            return shared.tracker.disposition(for: .keyDown, keyCode: keyCode, isSuppressing: shared.isSuppressing)
+        }
+        guard disposition == .suppress else { return .pass }
+        let flags = ModifierFlags(rawValue: event.flags.rawValue)
+        let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+        // キーの内容（keyCode）はログに出さない（ユーザーの入力のため。design.md 14 章）
+        continuation.yield(.hintKey(keyCode: keyCode, flags: flags, isRepeat: isRepeat))
+        return .suppress
+    }
+
+    /// マウスボタンの押下。起動キーの判定を取り消し（暫定 Q-2: ⌘ クリックで起動しない）、
+    /// キー破棄が ON なら `.pointerDown` を送る（暫定 Q-10）。
+    private func handlePointerDown(event: CGEvent, at now: Timestamp) {
+        // Tobi 自身の代替クリック（MouseClickPoster）は、ユーザーのクリックとして扱わない（design.md 10 章）
+        guard !TobiEventMarker.isMarked(event) else { return }
+        let isSuppressing = state.withLock { shared in
+            _ = shared.detector.handle(.pointerDown(at: now))
+            return shared.isSuppressing
+        }
+        guard isSuppressing else { return }
+        continuation.yield(.pointerDown)
+    }
+
     private func handleFlagsChanged(event: CGEvent, at now: Timestamp) {
-        let keyCode = UInt16(truncatingIfNeeded: event.getIntegerValueField(.keyboardEventKeycode))
+        let keyCode = Self.keyCode(of: event)
         let flags = ModifierFlags(rawValue: event.flags.rawValue)
         let triggeredKey: TriggerKey? = state.withLock { shared in
             guard shared.detector.handle(.flagsChanged(keyCode: keyCode, flags: flags, at: now)) == .tapped else {
@@ -205,6 +304,9 @@ final class TapContext: Sendable {
         // yield はタップのスレッドからだけ行うので、ロックの外でも順序は保たれる
         continuation.yield(.triggered(at: now))
         Log.hotkey.notice("triggered: 起動キー（\(triggeredKey.rawValue, privacy: .public)）の単独タップを検出した")
+        #if DEBUG
+            runDebugTapHook()
+        #endif
     }
 
     /// OS がタップを無効化した。すぐに再有効化し、判定の途中状態を捨てる（design.md 7.4、F-1.10）。
@@ -224,4 +326,29 @@ final class TapContext: Sendable {
         continuation.yield(.tapReenabled(reason: reason))
         Log.hotkey.warning("イベントタップが OS に無効化された（\(reason.rawValue, privacy: .public)）。再有効化した")
     }
+
+    #if DEBUG
+        /// Debug の `--tap-hook` を、単独タップの検出の直後に実行する（T38 の F-1.10 の手動確認のため）。
+        /// 起動キーのタップを合図にすることで、確認する人が無効化の起きる時点を選べるようにしている。
+        private func runDebugTapHook() {
+            switch debugTapHook {
+            case nil:
+                return
+            case .timeout:
+                Log.hotkey.notice("Debug（--tap-hook=timeout）: コールバックを止めて tapDisabledByTimeout を起こす")
+                // ロックの外で止める。ロックを持ったまま止めると、MainActor の setSuppressing / status まで止まるため
+                Thread.sleep(forTimeInterval: EventTapDebugHooks.timeoutHookSleep)
+            case .disable:
+                let disabled = state.withLock { shared in
+                    guard case .running(_, let resources) = shared.lifecycle else { return false }
+                    // 自分で無効にした場合は無効化の通知が届かない。ウォッチドッグの再有効化（1 秒ごと）を確かめるため
+                    CGEvent.tapEnable(tap: resources.port, enable: false)
+                    return true
+                }
+                Log.hotkey.notice(
+                    "Debug（--tap-hook=disable）: イベントタップを無効にした（disabled=\(disabled, privacy: .public)）"
+                )
+            }
+        }
+    #endif
 }

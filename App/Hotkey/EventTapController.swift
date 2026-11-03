@@ -63,12 +63,13 @@ enum EventTapError: Error, Equatable {
 /// - タップのスレッドと MainActor で共有する状態は `TapContext` が `Synchronization.Mutex` で守る（design.md 13 章）。
 /// - 起動キーの単独タップを検出すると、タップのスレッドが自分でキー破棄を ON にしてから `.triggered` を送る（D-8）。
 /// - OS がタップを無効化したら、コールバックの中で再有効化して判定の途中状態を捨て、`.tapReenabled` を送る（F-1.10）。
+/// - キー破棄が ON の間、keyDown / keyUp は design.md 7.3 の規則（`KeySuppressionTracker`）で破棄し、破棄した keyDown を
+///   `.hintKey` で送る（F-7）。flagsChanged とクリックは破棄しない。クリックは `.pointerDown` で送る（暫定 Q-10）。
+///   キー破棄の OFF は `setSuppressing(false)`（`KeySuppressionGate`）で行う。
+/// - 権限の取り消しと、通知のない無効化・停止への対処は `EventTapWatchdog` が行う（design.md 7.4）。
 ///
 /// スレッド: どのスレッドから呼んでもよい（`Sendable`）。通常は MainActor（`HotkeyModule`）が持つ。
 /// `events` の購読者は 1 つにする（`AsyncStream` は複数の購読者に同じ要素を配らない）。
-///
-/// T34 が足すもの: keyDown / keyUp のキー破棄、マウス押下、`KeySuppressionGate` への準拠、ウォッチドッグ、
-/// `updateTriggerKey(_:)`。
 final class EventTapController: Sendable {
     /// タップのスレッドからの通知。`start()` / `stop()` を繰り返しても同じストリームを使い続ける。
     /// コントローラが解放されると終わる。
@@ -82,6 +83,12 @@ final class EventTapController: Sendable {
         let (stream, continuation) = AsyncStream.makeStream(of: TapEvent.self, bufferingPolicy: .unbounded)
         events = stream
         context = TapContext(triggerKey: triggerKey, continuation: continuation)
+        #if DEBUG
+            // Debug の --trigger-key（EventTapDebugHooks）。設定の値より優先する（T38 の手動確認のため）
+            if let debugTriggerKey = EventTapDebugHooks.options.triggerKey {
+                context.updateTriggerKey(debugTriggerKey)
+            }
+        #endif
     }
 
     deinit {
@@ -127,5 +134,190 @@ final class EventTapController: Sendable {
     @discardableResult
     func reenableIfDisabled() -> Bool {
         context.reenableIfDisabled()
+    }
+
+    /// 起動キーを変える（S-1。T52 の設定画面から呼ぶ）。タップを作り直さずに、次のイベントから新しいキーで判定する。
+    /// 押下の途中などの判定の状態は捨てる。
+    func updateTriggerKey(_ triggerKey: TriggerKey) {
+        context.updateTriggerKey(triggerKey)
+    }
+}
+
+extension EventTapController: KeySuppressionGate {
+    /// キー破棄を切り替える（design.md 7.2・13 章）。MainActor の Coordinator がヒントモードを抜けるときに `false` を渡す。
+    ///
+    /// ON はタップのスレッドが単独タップの検出時に自分で立てる（D-8）。タップがないときの ON は受け付けない
+    /// （作り直したタップが、作った直後からキーを破棄しないようにするため）。待たずに終わる。
+    func setSuppressing(_ suppressing: Bool) {
+        context.setSuppressing(suppressing)
+    }
+}
+
+/// `EventTapWatchdog` からの通知。T37 が案内画面の表示と閉じるのに使う（N-3.3〜N-3.5）。
+enum EventTapWatchdogEvent: Equatable, Sendable {
+    /// 権限が許可された（未許可からの変化）。続けてタップを作り、結果を `.tapStarted` / `.tapStartFailed` で送る。
+    case permissionGranted
+    /// 権限が取り消された。タップを止め、キー破棄を OFF にした（N-3.4）。
+    case permissionRevoked
+    /// タップを作った（ウォッチドッグの開始時、許可の後、予期しない停止からの作り直し）。
+    case tapStarted
+    /// タップを作れなかった（N-3.5）。権限が変わるまで（取り消し → 許可）作り直さない。
+    case tapStartFailed(EventTapError)
+}
+
+/// 権限とタップの状態を見張り、権限がある間はタップが動いているようにする（design.md 7.4、N-3.4、F-1.10）。
+///
+/// - 権限の取り消しは `PermissionMonitor.statusChanges()` で知る（`AXIsProcessTrusted()` を 2 か所から呼ばない。
+///   T32 の申し送り）。取り消されたらタップを止め、キー破棄を OFF にする（`EventTapController.stop()`）。
+///   V-7 で OS はタップを止めないと分かっているため、止めないとヒントモード中ならキー入力が止まったままになる。
+/// - 許可されたらタップを作る。
+/// - 1 秒ごとに `EventTapController.status` を見る。権限があるのに `.disabled` なら再有効化し（無効化の通知の
+///   取りこぼし）、`.notRunning` なら `stop()` → `start()` で作り直す（run loop の予期しない終了）。
+///
+/// `EventTapController` とは別の型にした。コントローラはタップのスレッドからも触る `Sendable` の型で、
+/// こちらは MainActor の `PermissionMonitor` と Timer に依存するため（design.md 13 章）。
+///
+/// 使い方（T37）: `PermissionMonitor` は App で 1 つだけ作り、`start()` しておく。起動時の権限の案内は
+/// `permissionMonitor.status` を見て出す。その後の変化とタップの作成の結果は `events` で受ける。
+/// ```swift
+/// let watchdog = EventTapWatchdog(controller: eventTap, permissionMonitor: permissionMonitor)
+/// Task { for await event in watchdog.events { ... } }
+/// watchdog.start()   // 権限があればここでタップを作る
+/// ```
+/// タップを意図して止めるとき（終了時）は、先に `stop()` を呼ぶ。呼ばないと、1 秒後にタップを作り直す。
+@MainActor
+final class EventTapWatchdog {
+    /// 確認の間隔。V-7 で 5 秒から変えた（取り消しの検出までキー入力が止まったままになり得るため。design.md 7.4）。
+    private static let interval: TimeInterval = 1.0
+
+    /// 通知。購読者は 1 つにする。取りこぼさないよう上限なしで溜める（変化は 1 秒に高々数回）。
+    let events: AsyncStream<EventTapWatchdogEvent>
+
+    private let continuation: AsyncStream<EventTapWatchdogEvent>.Continuation
+    private let controller: EventTapController
+    private let permissionMonitor: PermissionMonitor
+    private var timer: Timer?
+    private var permissionTask: Task<Void, Never>?
+    /// 作成中の `controller.start()`。作成中に重ねて作らないために持つ。
+    private var startTask: Task<Void, Never>?
+    /// 作成に失敗した後は、権限が変わるまで作り直さない。毎秒作り直して失敗の案内を出し続けないため。
+    private var isRetryBlockedByFailure = false
+
+    init(controller: EventTapController, permissionMonitor: PermissionMonitor) {
+        self.controller = controller
+        self.permissionMonitor = permissionMonitor
+        (events, continuation) = AsyncStream.makeStream(of: EventTapWatchdogEvent.self, bufferingPolicy: .unbounded)
+    }
+
+    isolated deinit {
+        timer?.invalidate()
+        permissionTask?.cancel()
+        continuation.finish()
+    }
+
+    /// 見張りを始める。権限があってタップがなければ、ここでタップを作る。すでに始めているときは何もしない。
+    func start() {
+        guard timer == nil else { return }
+        let changes = permissionMonitor.statusChanges()
+        permissionTask = Task { [weak self] in
+            for await status in changes {
+                self?.handlePermissionChange(status)
+            }
+        }
+        let timer = Timer(timeInterval: Self.interval, repeats: true) { [weak self] _ in
+            // メインの run loop に登録したタイマーなので、メインスレッドで呼ばれる
+            MainActor.assumeIsolated {
+                self?.check()
+            }
+        }
+        timer.tolerance = 0.1
+        // メニューを開いている間（event tracking モード）も確認を続ける（PermissionMonitor と同じ理由）
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+        if permissionMonitor.status == .granted {
+            startTap(reason: "ウォッチドッグの開始")
+        }
+    }
+
+    /// 見張りを止める。タップは止めない（止めるときは、この後に `EventTapController.stop()` を呼ぶ）。
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+        permissionTask?.cancel()
+        permissionTask = nil
+    }
+
+    private func handlePermissionChange(_ status: PermissionStatus) {
+        isRetryBlockedByFailure = false
+        switch status {
+        case .notGranted:
+            // 作成の途中でも止める（作成中のタップは finishStart で破棄され、start() は stoppedDuringStart で終わる）
+            controller.stop()
+            Log.hotkey.warning("アクセシビリティ権限が取り消されたため、イベントタップを止め、キー破棄を OFF にした")
+            continuation.yield(.permissionRevoked)
+        case .granted:
+            continuation.yield(.permissionGranted)
+            startTap(reason: "権限が許可された")
+        }
+    }
+
+    /// 1 秒ごとの確認。
+    private func check() {
+        // 作成中は status が .starting なので見ない
+        guard startTask == nil else { return }
+        let tapStatus = controller.status
+        switch permissionMonitor.status {
+        case .notGranted:
+            // 取り消しは handlePermissionChange で止めている。それでもタップが残っていれば止める（N-3.4）
+            guard tapStatus != .notRunning else { return }
+            controller.stop()
+            Log.hotkey.error("権限がないのにイベントタップが残っていたので止めた")
+        case .granted:
+            switch tapStatus {
+            case .enabled, .starting:
+                break
+            case .disabled:
+                // 無効化の通知を取りこぼした。ログは reenableIfDisabled が残す
+                controller.reenableIfDisabled()
+            case .notRunning:
+                guard !isRetryBlockedByFailure else { return }
+                Log.hotkey.error("イベントタップが予期せず止まっていたので作り直す")
+                controller.stop()
+                startTap(reason: "予期しない停止からの作り直し")
+            }
+        }
+    }
+
+    private func startTap(reason: String) {
+        guard startTask == nil, controller.status == .notRunning else { return }
+        Log.hotkey.notice("イベントタップを作る（\(reason, privacy: .public)）")
+        let controller = controller
+        startTask = Task { [weak self] in
+            let result: Result<Void, EventTapError>
+            do throws(EventTapError) {
+                try await controller.start()
+                result = .success(())
+            } catch {
+                result = .failure(error)
+            }
+            self?.finishStart(result)
+        }
+    }
+
+    private func finishStart(_ result: Result<Void, EventTapError>) {
+        startTask = nil
+        switch result {
+        case .success:
+            continuation.yield(.tapStarted)
+        case .failure(.stoppedDuringStart):
+            // 作成中に権限が取り消された。.permissionRevoked は送ってある
+            Log.hotkey.notice("イベントタップの作成中に停止したので、作成を取りやめた")
+        case .failure(.alreadyStarted):
+            // startTap で .notRunning を確かめているので、ウォッチドッグの外で start() が呼ばれた場合だけ起きる
+            Log.hotkey.fault("ウォッチドッグの外でイベントタップが開始された。ウォッチドッグからは作らない")
+        case .failure(let error):
+            isRetryBlockedByFailure = true
+            continuation.yield(.tapStartFailed(error))
+        }
     }
 }
