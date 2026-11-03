@@ -31,6 +31,9 @@ enum TreeWalkerRoles {
         "AXImage",
         "AXScrollBar",
         "AXValueIndicator",
+        // 子は閉じたメニュー（AXMenu → AXMenuItem）で、辿ってもヒットがなく時間だけかかる（V-5: 312 件、約 14ms）。
+        // 開いているメニューは収集側が別の根として走査するので、ここで辿らなくても項目は取りこぼさない（D-31）
+        "AXMenuBarItem",
     ]
 
     /// 子のクリップを自分の frame で狭めるロール（見える範囲が自分の frame に限られるもの）。
