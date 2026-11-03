@@ -8,7 +8,8 @@ import TobiCore
 /// `traversalTargets` の各要素は `occlusionWindows` にも同じ値で入っている。
 struct WindowListSnapshot: Equatable, Sendable {
     /// 走査の対象: レイヤー 0、所有者が Tobi 以外、`kCGWindowAlpha > 0`（design.md 8.1 手順 2）。
-    /// メニューバーと開いているメニューは含めない（T58 で加える）。
+    /// メニューバーと開いているメニューは含めない（収集側が `menuBarWindows` / `popUpMenuWindows(ownedBy:)` から
+    /// 別の根として加える。T58）。
     let traversalTargets: [WindowInfo]
     /// 遮蔽の判定（`OcclusionFilter`）に渡す全レイヤーのウィンドウ。
     /// `kCGWindowAlpha == 0` のウィンドウと Tobi 自身のウィンドウは除いてある。`OcclusionFilter` は alpha を見ずに
@@ -16,6 +17,29 @@ struct WindowListSnapshot: Equatable, Sendable {
     let occlusionWindows: [WindowInfo]
     /// パースできずにスキップした項目（`windowListEntrySkipped`）。呼び出し側がログに出す。
     let diagnostics: [CollectionDiagnostic]
+}
+
+extension WindowListSnapshot {
+    /// メニューバーのウィンドウのレイヤー（`kCGMainMenuWindowLevel`）。
+    static let mainMenuLayer = Int(CGWindowLevelForKey(.mainMenuWindow))
+    /// 開いているメニュー（サブメニュー・コンテキストメニューを含む）のウィンドウのレイヤー（`kCGPopUpMenuWindowLevel`）。
+    static let popUpMenuLayer = Int(CGWindowLevelForKey(.popUpMenuWindow))
+
+    /// メニューバーのウィンドウ（前面から順。ディスプレイごとに 1 枚ありうる）。
+    ///
+    /// 所有者は前面のアプリではなく WindowServer なので、所有者では絞らない（macOS 27 の実機で確認）。
+    /// 前面のアプリの `AXMenuBar` と frame で対応付けるのは収集側（design.md 8.1 手順 2、8.6）。
+    var menuBarWindows: [WindowInfo] {
+        occlusionWindows.filter { $0.layer == Self.mainMenuLayer }
+    }
+
+    /// `pid` が所有する、開いているメニューのウィンドウ（前面から順。design.md 8.1 手順 2、D-31）。
+    ///
+    /// ほかのアプリ（メニューバー右側のステータスアイテムなど）のメニューは走査しないので含めない（F-2.16）。
+    /// 遮蔽の判定には、所有者によらず `occlusionWindows` のまま使う。
+    func popUpMenuWindows(ownedBy pid: ProcessID) -> [WindowInfo] {
+        occlusionWindows.filter { $0.layer == Self.popUpMenuLayer && $0.ownerPID == pid }
+    }
 }
 
 /// `CGWindowListCopyWindowInfo` の CF の辞書を `WindowInfo` に変換し、走査の対象と遮蔽の判定用に分ける。

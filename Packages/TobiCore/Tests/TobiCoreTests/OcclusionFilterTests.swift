@@ -222,6 +222,37 @@ struct OcclusionMenuTests {
 
         #expect(OcclusionFilter.visibleElements([target], windows: [overlappingMenu, menuBar, document]).isEmpty)
     }
+
+    @Test("開いているメニューの項目をメニューバーのウィンドウに属させると、自分のメニューに隠れて消える（D-31）")
+    func menuItemsMustBelongToMenuWindow() {
+        let item = CGRect(x: 40, y: 30, width: 220, height: 20)
+        let asMenuWindow = element(1, window: 30, rect: item, role: "AXMenuItem")
+        let asMenuBarWindow = element(2, window: 20, rect: item, role: "AXMenuItem")
+
+        let windows = [menu, menuBar, document]
+
+        let visible = OcclusionFilter.visibleElements([asMenuWindow, asMenuBarWindow], windows: windows)
+
+        #expect(ids(visible) == [1])
+    }
+
+    @Test("サブメニュー（前面のポップアップ）は、親のメニューの重なった項目だけを隠す")
+    func submenuHidesParentItems() {
+        // 親のメニュー (40, 24)〜(260, 324) の右端に、サブメニュー (250, 50)〜(450, 250) が重なる
+        let submenu = window(32, zIndex: 0, rect: CGRect(x: 250, y: 50, width: 200, height: 200), layer: popUpMenuLayer)
+        let parentMenu = window(30, zIndex: 1, rect: menu.frame.rect, layer: popUpMenuLayer)
+        let menuBarBehind = window(20, zIndex: 2, rect: menuBar.frame.rect, layer: mainMenuLayer)
+        let elements = [
+            element(1, window: 32, center: CGPoint(x: 350, y: 60)),  // サブメニューの項目
+            element(2, window: 30, center: CGPoint(x: 150, y: 60)),  // 親の項目（重ならない）
+            element(3, window: 30, center: CGPoint(x: 255, y: 60)),  // 親の項目の中心がサブメニューの下
+            element(4, window: 20, center: CGPoint(x: 300, y: 12)),  // メニューバーの項目（どのメニューにも重ならない）
+        ]
+
+        let visible = OcclusionFilter.visibleElements(elements, windows: [submenu, parentMenu, menuBarBehind])
+
+        #expect(ids(visible) == [1, 2, 4])
+    }
 }
 
 @Suite("OcclusionFilter.isFullyCovered（design.md 8.1 の手順 3）")

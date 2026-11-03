@@ -12,7 +12,7 @@ import TobiCore
 /// - ステータスアイテムの表示は `permissionMonitor.statusChanges()` で更新する（N-2.3）。
 @MainActor
 final class HotkeyModule: AppModule {
-    /// 起動キー。設定がまだないので右 ⌘ に固定する（T52・T54 で設定から読む）。
+    /// 起動直後の仮の起動キー。保存された設定の値は `SettingsModule.start()` が `updateTriggerKey` で反映する。
     /// Debug ビルドでは `--trigger-key`（`EventTapDebugHooks`）がこれより優先される。
     private static let triggerKey: TriggerKey = .rightCommand
 
@@ -29,7 +29,7 @@ final class HotkeyModule: AppModule {
     /// keyCode → `HintKeyInput` の変換（MainActor）。
     let keyTranslator: KeyTranslator
 
-    /// タップのスレッドからの通知（`eventTap.events`）。購読者は 1 つだけ（今は仮のヒントモード、T48 で Coordinator の結線）。
+    /// タップのスレッドからの通知（`eventTap.events`）。購読者は 1 つだけ（`HintModeModule` が Coordinator に結ぶ）。
     var tapEvents: AsyncStream<TapEvent> {
         eventTap.events
     }

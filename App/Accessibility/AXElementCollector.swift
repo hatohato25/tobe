@@ -2,6 +2,7 @@
 // 収集の段階（計画・アプリ 1 つの走査・内訳）を private の型でこのファイルに閉じ込めているため 400 行を超える。
 // 別のファイルに分けると、これらの型を internal に開く必要がある（T42 の担当ファイルの制約もある）。
 
+import AppKit
 import ApplicationServices
 import CoreGraphics
 import Dispatch
@@ -17,6 +18,8 @@ import os
 /// 2. `ElementHandleRegistry.beginCollection()` で前の収集の対応を消す。
 /// 3. システム全体の IPC のタイムアウトを 50ms にする（`AXClient.applySystemWideMessagingTimeout()`。下の「タイムアウト」）。
 /// 4. `WindowEnumerator` でウィンドウを列挙し、前面の 1 枚に完全に覆われたウィンドウと、画面の外にあるウィンドウを除く。
+///    前面のアプリ（`NSWorkspace.frontmostApplication`。Tobi 自身なら無し）には、メニューバーと開いているメニューの
+///    ウィンドウも割り当てる（design.md 8.1 手順 2、D-31。下の「メニュー」）。
 /// 5. 所有者の PID ごとにまとめ、アプリごとに GCD のキュー（`.userInteractive`）で `AppCollectionJob` を実行し、
 ///    `withTaskGroup` で全部を待つ（同じアプリの中は前面のウィンドウから順に直列。D-12）。
 /// 6. 集まったヒットを `ElementHandleRegistry` に登録して `ElementID` を振り、`CollectionResult` にする。
@@ -30,7 +33,13 @@ import os
 /// 各アプリの走査は IPC の前ごとにフラグを確かめて止まり（実行中の IPC 1 回分、最大 50ms は待つ）、すべて止まってから
 /// `CollectionError.cancelled` を投げる。
 ///
-/// メニューバーと開いているメニューは走査しない（T58 で `AppCollectionJob.resolveRoots` に根を足す）。
+/// メニュー（F-2.14〜F-2.16、design.md 8.1 手順 2、8.6、D-31）: 前面のアプリだけ、次を別の根として走査する。
+/// - メニューバー: アプリの `AXMenuBar`。項目（`AXMenuBarItem`）はリーフなので、閉じたメニューの中は辿らない（T64）。
+///   根の要素は、frame が一致するメニューバーのウィンドウ（WindowServer が所有する）に属させる。
+/// - 開いているメニュー: 前面のアプリが所有する `kCGPopUpMenuWindowLevel` のウィンドウごとに、その中心を AX でヒット
+///   テストし、親を辿って `AXMenu` を探す。frame が 1pt 以内で一致すれば、そのウィンドウの `WindowID` の根にする。
+///   メニューバーのウィンドウに属させると、自分のメニューに遮蔽されて消えるため。
+/// - Dock、メニューバー右側（ステータスアイテム、コントロールセンター）、通知は、前面のアプリのものではないので走査しない。
 /// 相手のアプリの AX を有効にする属性（Chromium・Electron 向けのもの）は書き込まない（F-2.7）。
 ///
 /// スレッド: 状態は `registry`（ロック付き）だけなので、どの隔離から呼んでもよい。IPC はすべて GCD のキューで行い、
@@ -65,10 +74,11 @@ struct AXElementCollector: ElementCollecting {
         let generation = registry.beginCollection()
         try applySystemWideTimeout()
 
+        let frontPID = await Self.frontmostApplicationPID()
         let snapshot = try await Self.runOnQueue { [windowEnumerator] in
             Result { () throws(CollectionError) in try windowEnumerator.enumerate() }
         }.get()
-        let plan = CollectionPlan(snapshot: snapshot, screenUnion: Self.activeDisplayUnion())
+        let plan = CollectionPlan(snapshot: snapshot, screenUnion: Self.activeDisplayUnion(), frontPID: frontPID)
 
         let flag = CancellationFlag()
         let apps = await withTaskCancellationHandler {
@@ -153,6 +163,17 @@ struct AXElementCollector: ElementCollecting {
         }
     }
 
+    /// メニューバーと開いているメニューを走査する、前面のアプリ（design.md 8.1 手順 2）。
+    ///
+    /// `NSWorkspace` は MainActor で読む（AppKit の状態で、通知で更新される）。呼び出し元の Coordinator は MainActor
+    /// なので、ここで待つのは MainActor への 1 回の切り替えだけ。前面が Tobi 自身（設定画面など）なら nil にする（F-2.12）。
+    @MainActor
+    private static func frontmostApplicationPID() -> ProcessID? {
+        guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
+        guard app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return nil }
+        return ProcessID(rawValue: app.processIdentifier)
+    }
+
     /// 有効なディスプレイ全体の和集合（グローバル座標）。ディスプレイがない・取れないときは nil。
     ///
     /// `CGDisplayBounds` は AX・`CGWindowList` と同じ左上原点のグローバル座標なので、変換は要らない
@@ -185,7 +206,8 @@ private struct CollectionPlan {
     let offscreenWindowCount: Int
     let hasScreens: Bool
 
-    init(snapshot: WindowListSnapshot, screenUnion: CGRect?) {
+    /// - Parameter frontPID: 前面のアプリ。メニューバーと開いているメニューを、このアプリの根に加える（nil なら加えない）。
+    init(snapshot: WindowListSnapshot, screenUnion: CGRect?, frontPID: ProcessID?) {
         hasScreens = screenUnion != nil
         if screenUnion == nil {
             // 画面が 0 枚なら見える範囲がないので何も走査しない（ヒントモードは要素 0 件として扱う）
@@ -200,18 +222,24 @@ private struct CollectionPlan {
                 covered += 1
                 continue
             }
-            // 根のクリップは、ウィンドウの frame と画面の和集合の積（design.md 8.4）
-            let clip = screenUnion.map { window.frame.rect.intersection($0) } ?? .null
-            guard !clip.isEmpty else {
+            guard let target = WindowTarget(window: window, screenUnion: screenUnion) else {
                 offscreen += 1
                 continue
             }
-            let target = WindowTarget(window: window, clip: GlobalRect(rect: clip))
             if let index = groupIndexByPID[window.ownerPID] {
                 groups[index].targets.append(target)
             } else {
                 groupIndexByPID[window.ownerPID] = groups.count
-                groups.append(AppPlan(pid: window.ownerPID, targets: [target]))
+                groups.append(AppPlan(pid: window.ownerPID, targets: [target], menus: nil))
+            }
+        }
+        if let frontPID, let menus = MenuTargets(snapshot: snapshot, frontPID: frontPID, screenUnion: screenUnion) {
+            if let index = groupIndexByPID[frontPID] {
+                groups[index].menus = menus
+            } else {
+                // 通常のウィンドウがない前面のアプリ（ウィンドウを閉じた Finder など）も、メニューバーは走査する。
+                // メニューは最前面にあるので、アプリの並びの先頭に置く
+                groups.insert(AppPlan(pid: frontPID, targets: [], menus: menus), at: 0)
             }
         }
         // traversalTargets は前面から順なので、アプリの順も各アプリの中のウィンドウの順も前面から
@@ -224,13 +252,41 @@ private struct CollectionPlan {
 /// 1 つのアプリで走査するウィンドウ（前面から順）。
 private struct AppPlan: Sendable {
     let pid: ProcessID
+    /// レイヤー 0 のウィンドウ。
     var targets: [WindowTarget]
+    /// 前面のアプリだけが持つ、メニューバーと開いているメニューのウィンドウ。
+    var menus: MenuTargets?
 }
 
 /// 走査する CG のウィンドウと、その根のクリップ。
 private struct WindowTarget: Sendable {
     let window: WindowInfo
     let clip: GlobalRect
+
+    /// 根のクリップは、ウィンドウの frame と画面の和集合の積（design.md 8.4）。画面がない・画面の外なら nil。
+    init?(window: WindowInfo, screenUnion: CGRect?) {
+        let clip = screenUnion.map { window.frame.rect.intersection($0) } ?? .null
+        guard !clip.isEmpty else { return nil }
+        self.window = window
+        self.clip = GlobalRect(rect: clip)
+    }
+}
+
+/// 前面のアプリの根の候補にする、メニューのウィンドウ（design.md 8.1 手順 2、D-31）。
+private struct MenuTargets: Sendable {
+    /// メニューバーのウィンドウ（ディスプレイごと）。`AXMenuBar` と frame が一致したものを根の `WindowID` にする。
+    let menuBarWindows: [WindowTarget]
+    /// 前面のアプリが所有する、開いているメニューのウィンドウ（前面から順）。
+    let popUpMenuWindows: [WindowTarget]
+
+    /// 画面に見えているメニューのウィンドウが 1 枚もなければ nil（メニューバーを自動的に隠している場合など）。
+    init?(snapshot: WindowListSnapshot, frontPID: ProcessID, screenUnion: CGRect?) {
+        menuBarWindows = snapshot.menuBarWindows.compactMap { WindowTarget(window: $0, screenUnion: screenUnion) }
+        popUpMenuWindows = snapshot.popUpMenuWindows(ownedBy: frontPID).compactMap {
+            WindowTarget(window: $0, screenUnion: screenUnion)
+        }
+        guard !menuBarWindows.isEmpty || !popUpMenuWindows.isEmpty else { return nil }
+    }
 }
 
 /// 呼び出し元の Task のキャンセルを、GCD のキューで動く走査に伝えるフラグ（design.md 8.5、13 章、T16 の注記）。
@@ -250,12 +306,13 @@ private final class CancellationFlag: Sendable {
 
 /// 1 つのアプリの走査（design.md 8.1 手順 4〜5、8.4、8.7）。GCD のキューの上で同期に実行する。
 ///
+/// 0. 前面のアプリなら、開いているメニューとメニューバーの根を決める（`resolveMenuRoots`。型の説明の「メニュー」）。
 /// 1. アプリの要素（収集ごとに作り直す）の `AXWindows` を読む。
 /// 2. 各 AX ウィンドウの `AXPosition` / `AXSize` / `AXMinimized` を 1 回の IPC で読み、最小化されておらず、frame が
 ///    CG のウィンドウの bounds と 1pt 以内で一致するものを、その `WindowID` の根にする（D-9）。一致しない AX
 ///    ウィンドウ（別の Space、画面外など）は捨てる。CG のウィンドウがすべて対応付いたら、残りの AX ウィンドウは読まない。
-/// 3. 根を前面から順に `TreeWalker` で走査する。ノード数の上限はアプリ単位なので、次の根には
-///    「4000 − それまでの `visitedNodeCount` の合計」を渡す（design.md 8.4、T23）。
+/// 3. 根を前面から順（開いているメニュー、メニューバー、ウィンドウ）に `TreeWalker` で走査する。ノード数の上限は
+///    アプリ単位なので、次の根には「4000 − それまでの `visitedNodeCount` の合計」を渡す（design.md 8.4、T23）。
 ///    終了理由が `completed` 以外（期限、上限、応答なし、キャンセル、権限の取り消し）なら、残りの根は走査しない。
 ///
 /// 1〜2 の IPC も `TreeWalker` と同じ規則で扱う: IPC の前に期限とキャンセルを確かめ、期限までの残りが 50ms より短ければ
@@ -281,7 +338,8 @@ private struct AppCollectionJob: Sendable {
         var stopReason = WalkStopReason.completed
         var roots: [WalkRoot] = []
         do throws(JobInterruption) {
-            roots = try resolveRoots(state: &state, issues: issues)
+            roots = try resolveMenuRoots(state: &state, issues: issues)
+            roots += try resolveWindowRoots(state: &state, issues: issues)
         } catch {
             stopReason = error.reason
         }
@@ -317,7 +375,8 @@ private struct AppCollectionJob: Sendable {
             hitCount: hits.count,
             visitedNodeCount: visited,
             targetWindowCount: plan.targets.count,
-            rootCount: roots.count,
+            rootCount: state.windowRootCount,
+            menus: state.menuReport,
             stopReason: stopReason,
             readErrors: state.readErrors,
             issues: issues.snapshot(),
@@ -329,12 +388,13 @@ private struct AppCollectionJob: Sendable {
     // MARK: 根を決める
 
     /// `AXWindows` を読み、CG のウィンドウと frame で対応付けた根を、CG のウィンドウの順（前面から）で返す。
-    private func resolveRoots(
+    private func resolveWindowRoots(
         state: inout JobState,
         issues: AXAttributeIssueCounter
     ) throws(JobInterruption) -> [WalkRoot] {
-        // アプリの要素は収集ごとに作る。前の収集で設定した短いタイムアウトが残らない（T41 の前提）
-        let app = AXElementRef.application(pid: plan.pid.rawValue)
+        // メニューだけを走査する前面のアプリ（通常のウィンドウがない）では、AXWindows を読む IPC を省く
+        guard !plan.targets.isEmpty else { return [] }
+        let app = makeApplicationElement()
         try checkBeforeIPC()
         let windowsValue: CFTypeRef
         do throws(AccessibilityReadError) {
@@ -370,10 +430,18 @@ private struct AppCollectionJob: Sendable {
             let target = plan.targets[index]
             matched[index] = WalkRoot(element: axWindow, windowID: target.window.id, clip: target.clip)
         }
-        return matched.compactMap(\.self)
+        let roots = matched.compactMap(\.self)
+        state.windowRootCount = roots.count
+        return roots
     }
 
-    /// AX ウィンドウの frame（左上原点のグローバル座標）。最小化されている、読めない、位置か大きさがないときは nil。
+    /// アプリの要素。根を決める段階ごとに作るので、前の収集で設定した短いタイムアウトが残らない（T41 の前提）。
+    private func makeApplicationElement() -> AXElementRef {
+        AXElementRef.application(pid: plan.pid.rawValue)
+    }
+
+    /// AX ウィンドウ（と `AXMenuBar`）の frame（左上原点のグローバル座標）。最小化されている、読めない、位置か大きさが
+    /// ないときは nil。最小化の属性を持たない要素（`AXMenuBar`）は、最小化されていないものとして扱う。
     private func readWindowFrame(
         _ window: AXElementRef,
         state: inout JobState,
@@ -457,6 +525,193 @@ private struct AppCollectionJob: Sendable {
     }
 }
 
+// MARK: - メニューの根を決める
+
+/// `AppCollectionJob` のうち、前面のアプリのメニューバーと開いているメニューの根を決める部分（型の本体が長くなるため分けた）。
+extension AppCollectionJob {
+    /// 開いているメニューを探すとき、ヒットテストで得た要素とその祖先で 1 回の IPC で読む属性。
+    static let menuSearchAttributes: [String] = [
+        kAXRoleAttribute, kAXPositionAttribute, kAXSizeAttribute, kAXParentAttribute,
+    ]
+    /// ヒットテストで得た要素から `AXMenu` を探して辿る親の数の上限。メニューの中のヒットは `AXMenuItem`（またはその
+    /// 中の要素）なので、通常は 1〜2 回で着く。上限は、メニューでないポップアップで根まで辿り続けないため。
+    static let menuSearchParentLimit = 3
+
+    /// 前面のアプリの、開いているメニュー（前面から順）とメニューバーの根を返す（design.md 8.1 手順 2、D-31）。
+    /// 前面のアプリでなければ空。対応付けの内訳は `state.menuReport` に残す。
+    private func resolveMenuRoots(
+        state: inout JobState,
+        issues: AXAttributeIssueCounter
+    ) throws(JobInterruption) -> [WalkRoot] {
+        guard let menus = plan.menus else { return [] }
+        let app = makeApplicationElement()
+        var report = MenuRootReport(
+            popUpMenuWindowCount: menus.popUpMenuWindows.count,
+            popUpMenuRootCount: 0,
+            menuBarWindowCount: menus.menuBarWindows.count,
+            hasMenuBarRoot: false
+        )
+        // 途中で打ち切られても、それまでの内訳は残す
+        defer { state.menuReport = report }
+
+        var roots: [WalkRoot] = []
+        for target in menus.popUpMenuWindows {
+            guard let root = try resolvePopUpMenuRoot(target, app: app, state: &state, issues: issues) else { continue }
+            roots.append(root)
+            report.popUpMenuRootCount += 1
+        }
+        if let root = try resolveMenuBarRoot(menus.menuBarWindows, app: app, state: &state, issues: issues) {
+            roots.append(root)
+            report.hasMenuBarRoot = true
+        }
+        return roots
+    }
+
+    /// `AXMenuBar` を読み、frame が一致するメニューバーのウィンドウの `WindowID` の根にする。
+    ///
+    /// 一致するウィンドウがなければ根にしない（メニューバーを自動的に隠していて画面にない、別のディスプレイの
+    /// メニューバーだけが見えている、など）。見えていないメニューバーの項目にラベルを付けないため。
+    private func resolveMenuBarRoot(
+        _ windows: [WindowTarget],
+        app: AXElementRef,
+        state: inout JobState,
+        issues: AXAttributeIssueCounter
+    ) throws(JobInterruption) -> WalkRoot? {
+        guard !windows.isEmpty else { return nil }
+        try checkBeforeIPC()
+        let value: CFTypeRef
+        do throws(AccessibilityReadError) {
+            try setTimeoutIfNeeded(on: app)
+            value = try client.attributeValue(kAXMenuBarAttribute, of: app)
+        } catch .attributeUnsupported {
+            // メニューバーを持たないアプリ（エージェント型のアプリなど）。走査するものがないだけで、失敗ではない
+            return nil
+        } catch {
+            try state.fail(error)
+            return nil
+        }
+        state.succeeded()
+        guard let menuBar = Self.element(value, attribute: kAXMenuBarAttribute),
+            let frame = try readWindowFrame(menuBar, state: &state, issues: issues),
+            let target = windows.first(where: { Self.framesMatch(frame, $0.window.frame.rect) })
+        else { return nil }
+        return WalkRoot(element: menuBar, windowID: target.window.id, clip: target.clip)
+    }
+
+    /// 開いているメニューのウィンドウの中心を AX でヒットテストし、その要素か祖先の `AXMenu` を根にする。
+    ///
+    /// ヒットテストにしたのは、メニューバーのメニュー・サブメニュー・コンテキストメニューを同じ方法で見つけるため
+    /// （AX ツリーでの位置がそれぞれ違う。メニューバーの項目の子、メニューの項目の子、アプリの子）。
+    /// アプリの要素でヒットテストするので、前面にある Tobi のオーバーレイには当たらない。
+    /// `AXMenu` が見つからない（メニューでないポップアップ）か、frame がウィンドウと 1pt 以内で一致しなければ根にしない。
+    private func resolvePopUpMenuRoot(
+        _ target: WindowTarget,
+        app: AXElementRef,
+        state: inout JobState,
+        issues: AXAttributeIssueCounter
+    ) throws(JobInterruption) -> WalkRoot? {
+        let windowFrame = target.window.frame.rect
+        try checkBeforeIPC()
+        var current: AXElementRef
+        do throws(AccessibilityReadError) {
+            try setTimeoutIfNeeded(on: app)
+            current = try Self.element(at: CGPoint(x: windowFrame.midX, y: windowFrame.midY), in: app)
+        } catch .attributeUnsupported {
+            // その位置にこのアプリの要素がない（.noValue）。メニューとして扱えないだけで、失敗ではない
+            return nil
+        } catch {
+            try state.fail(error)
+            return nil
+        }
+        state.succeeded()
+
+        for _ in 0...Self.menuSearchParentLimit {
+            guard let node = try readMenuSearchNode(current, state: &state, issues: issues) else { return nil }
+            if node.role == kAXMenuRole {
+                guard let frame = node.frame, Self.framesMatch(frame, windowFrame) else { return nil }
+                return WalkRoot(element: current, windowID: target.window.id, clip: target.clip)
+            }
+            guard let parent = node.parent else { return nil }
+            current = parent
+        }
+        return nil
+    }
+
+    /// `AXMenu` を探すために読む 1 要素の属性。
+    private struct MenuSearchNode {
+        let role: String?
+        let frame: CGRect?
+        let parent: AXElementRef?
+    }
+
+    /// ヒットテストの要素か祖先の、ロール・frame・親を 1 回の IPC で読む。読めなければ nil。
+    private func readMenuSearchNode(
+        _ element: AXElementRef,
+        state: inout JobState,
+        issues: AXAttributeIssueCounter
+    ) throws(JobInterruption) -> MenuSearchNode? {
+        try checkBeforeIPC()
+        do throws(AccessibilityReadError) {
+            try setTimeoutIfNeeded(on: element)
+            let values = try client.attributeValues(Self.menuSearchAttributes, of: element)
+            state.succeeded()
+            let role = try Self.slot(kAXRoleAttribute, issues: issues) { () throws(AXValueDecodingError) in
+                try values.string(kAXRoleAttribute)
+            }
+            let position = try Self.slot(kAXPositionAttribute, issues: issues) { () throws(AXValueDecodingError) in
+                try values.point(kAXPositionAttribute)
+            }
+            let size = try Self.slot(kAXSizeAttribute, issues: issues) { () throws(AXValueDecodingError) in
+                try values.size(kAXSizeAttribute)
+            }
+            let parentValue = try Self.slot(kAXParentAttribute, issues: issues) { () throws(AXValueDecodingError) in
+                try values.raw(kAXParentAttribute)
+            }
+            let frame = position.flatMap { position in size.map { CGRect(origin: position, size: $0) } }
+            return MenuSearchNode(
+                role: role,
+                frame: frame,
+                parent: parentValue.flatMap { Self.element($0, attribute: kAXParentAttribute) }
+            )
+        } catch {
+            try state.fail(error)
+            return nil
+        }
+    }
+
+    /// 1 つの `AXUIElement` の値（`AXMenuBar`、`AXParent`）を `AXElementRef` にする。
+    ///
+    /// `AXValueDecoder` には 1 要素の変換がないため、ここで持つ（T41 の申し送り）。型の確認は `AXValueDecoder` と同じく
+    /// `CFGetTypeID` で行い、`unsafeDowncast` する（CF 型には `as?` が常に成功してしまうため）。
+    /// 一括取得の「その属性の失敗」（`AXValue`）は属性なしとして nil にする。それ以外の型は AX の仕様に反するので、
+    /// 黙って捨てずにログに残す（型名と属性名だけ。要素の内容は出さない）。
+    private static func element(_ value: CFTypeRef, attribute: String) -> AXElementRef? {
+        let typeID = CFGetTypeID(value)
+        guard typeID == AXUIElementGetTypeID() else {
+            if typeID != AXValueGetTypeID() {
+                let typeName = CFCopyTypeIDDescription(typeID) as String
+                Log.collector.error("\(attribute, privacy: .public) の値が要素ではない: \(typeName, privacy: .public)")
+            }
+            return nil
+        }
+        return AXElementRef(raw: unsafeDowncast(value, to: AXUIElement.self))
+    }
+
+    /// `AXUIElementCopyElementAtPosition` で、アプリの要素のうち `point`（左上原点のグローバル座標）にあるものを得る。
+    ///
+    /// `AXClient` にヒットテストの口がないため、ここで呼ぶ（エラーの変換は `AXClient.check` の 1 か所を使う）。
+    /// その位置に要素がないときは `.attributeUnsupported`（`.noValue` の変換）を投げる。
+    private static func element(
+        at point: CGPoint,
+        in app: AXElementRef
+    ) throws(AccessibilityReadError) -> AXElementRef {
+        var element: AXUIElement?
+        try AXClient.check(AXUIElementCopyElementAtPosition(app.raw, Float(point.x), Float(point.y), &element))
+        guard let element else { throw AXClient.readError(for: .noValue) }
+        return AXElementRef(raw: element)
+    }
+}
+
 /// アプリ 1 つの走査を途中で止める理由（`WalkStopReason` のうち `completed` 以外）。
 private struct JobInterruption: Error {
     let reason: WalkStopReason
@@ -466,6 +721,10 @@ private struct JobInterruption: Error {
 private struct JobState {
     /// 根を決める段階と `TreeWalker` の読み取りの失敗の件数（`CollectionDiagnostic.readFailed` の元）。
     var readErrors: [AccessibilityReadError: Int] = [:]
+    /// AX ウィンドウと対応付いて根になったウィンドウの数（メニューの根は含めない）。
+    var windowRootCount = 0
+    /// 前面のアプリだけ。メニューの根の対応付けの内訳。
+    var menuReport: MenuRootReport?
     private var consecutiveCannotComplete = 0
 
     mutating func succeeded() {
@@ -572,7 +831,10 @@ struct AppCollectionReport: Sendable {
     /// 走査しようとした CG のウィンドウの数。
     let targetWindowCount: Int
     /// AX ウィンドウと対応付いて走査の根になった数（`targetWindowCount` との差は対応付かなかったウィンドウ）。
+    /// メニューの根は含めない（`menus`）。
     let rootCount: Int
+    /// 前面のアプリだけ。メニューバーと開いているメニューの根の内訳（前面のアプリでなければ nil）。
+    let menus: MenuRootReport?
     let stopReason: WalkStopReason
     let readErrors: [AccessibilityReadError: Int]
     /// 「属性なし」として扱った読み取り（型の不一致など）。TobiCore の診断には入れず、ログにだけ出す（T41 の申し送り）。
@@ -591,6 +853,9 @@ struct AppCollectionReport: Sendable {
             "  pid \(pid.rawValue): ヒット \(hitCount) 件、ノード \(visitedNodeCount) 件、"
                 + "根 \(rootCount)/\(targetWindowCount)、終了 \(stopReason)、\(elapsed)"
         ]
+        if let menus {
+            lines.append("    \(menus.logLine)")
+        }
         for (error, count) in sortedReadErrors {
             lines.append("    readError \(error): \(count)")
         }
@@ -600,5 +865,23 @@ struct AppCollectionReport: Sendable {
             lines.append("    attributeIssue \(issue.description): \(count)")
         }
         return lines
+    }
+}
+
+/// 前面のアプリの、メニューの根の対応付けの内訳（design.md 8.1 手順 2、D-31）。T49 の手動確認で、メニューが根に
+/// なったかを `--collect-once` で見るためにログへ出す。
+struct MenuRootReport: Sendable {
+    /// 前面のアプリが所有する、開いているメニューのウィンドウの数。
+    let popUpMenuWindowCount: Int
+    /// そのうち `AXMenu` と対応付いて根になった数。
+    var popUpMenuRootCount: Int
+    /// 画面に見えているメニューバーのウィンドウの数（ディスプレイごと）。
+    let menuBarWindowCount: Int
+    /// `AXMenuBar` がメニューバーのウィンドウと対応付いて根になったか。
+    var hasMenuBarRoot: Bool
+
+    var logLine: String {
+        "メニュー: メニューバー \(hasMenuBarRoot ? "あり" : "なし")（ウィンドウ \(menuBarWindowCount) 枚）、"
+            + "開いているメニュー 根 \(popUpMenuRootCount)/\(popUpMenuWindowCount)"
     }
 }
