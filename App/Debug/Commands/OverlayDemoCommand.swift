@@ -3,85 +3,124 @@
     import CoreGraphics
     import TobiCore
 
-    /// `--overlay-demo`: 固定のラベル 20 個を、全ディスプレイにそれぞれ表示する（T44。T45 が絞り込みと非表示を足す）。
+    /// `--overlay-demo`: 固定のラベル 20 個を全ディスプレイに出し、絞り込みと非表示を繰り返す（T44 / T45）。
     ///
-    /// - 画面ごとに `OverlayPanel` を 1 枚作り、5 列 × 4 行の格子にラベルを置く。格子の端の列・行は画面の右端・下端に
-    ///   anchor を置くので、`HintPlacement.clamp` で画面内に押し戻されて、角と辺にぴったり接して見える（F-3.5）。
-    ///   上端の行はメニューバーに重なる（`constrainFrameRect` の override と `.screenSaver` の確認。V-8）。
-    /// - 表示の 1 秒後に、Tobi がアクティブになっていないこととパネルがキーになっていないことをログに出す（F-3.7）。
-    /// - 画面の構成が変わったら、パネルを作り直して出し直す。
+    /// - `OverlayController`（T45）を通して表示する。画面ごとに 5 列 × 4 行の格子にラベルを置く。格子の端の列・行は
+    ///   画面の右端・下端に anchor を置くので、`HintPlacement.clamp` で画面内に押し戻されて、角と辺にぴったり接して
+    ///   見える（F-3.5）。上端の行はメニューバーに重なる（`constrainFrameRect` の override と `.screenSaver`。V-8）。
+    /// - 1 周（約 8 秒）: 全表示（3 秒）→ 偶数番目だけに絞り込み（`update`。3 秒）→ 非表示（`hide` を 2 回。2 秒）。
+    ///   周ごとに画面の一覧を読み直して出し直す。
+    /// - 最初の周だけ、存在しない画面の placement を 1 つ混ぜる（`OverlayController` が捨ててエラーログを出すことの確認）。
+    /// - 最初の表示の 1 秒後に、Tobi がアクティブになっていないこととパネルがキーになっていないことをログに出す（F-3.7）。
+    /// - 画面の構成が変わったら `rebuildPanels(for:)` でパネルを作り直す（表示中なら隠れる）。次の周から新しい構成で出る。
     ///
     /// 終了しないので、Ctrl-C などで止める。ログ（category: debug）にはラベルの文字列を出さない。
     struct OverlayDemoCommand: DebugCommand {
         private static let columns = 5
         private static let rows = 4
         private static let focusCheckDelay: Duration = .seconds(1)
+        private static let showDuration: Duration = .seconds(3)
+        private static let filteredDuration: Duration = .seconds(3)
+        private static let hiddenDuration: Duration = .seconds(2)
 
         func run() async throws {
             let provider = ScreenGeometryProvider()
             let changes = provider.screenChanges()
-            var panels = try await Self.present(provider.currentSnapshots(), reason: "起動時")
-            for await _ in changes {
-                for panel in panels {
-                    panel.dismiss()
+            let controller = OverlayController(screens: provider.currentSnapshots())
+            let watcher = Task { @MainActor in
+                for await _ in changes {
+                    Log.debug.notice("--overlay-demo: 画面の構成が変わったため、パネルを作り直す")
+                    controller.rebuildPanels(for: provider.currentSnapshots())
                 }
-                panels = try await Self.present(provider.currentSnapshots(), reason: "画面の構成の変更")
+            }
+            defer { watcher.cancel() }
+
+            let labels = HintLabelGenerator.labels(count: Self.columns * Self.rows, alphabet: .vimiumDefault)
+            var cycle = 0
+            while true {
+                // ScreenID は添字なので、周ごとに読み直す（画面の構成の変化の後に古い ID を使わない）
+                let screens = provider.currentScreens()
+                var placements = screens.flatMap { placements(for: $0, labels: labels) }
+                if cycle == 0 {
+                    placements.append(orphanPlacement(screenCount: screens.count))
+                }
+                let visible = Set(
+                    placements.enumerated().filter { $0.offset.isMultiple(of: 2) }.map { $0.element.elementID }
+                )
+
+                Log.debug.notice(
+                    """
+                    --overlay-demo [周 \(cycle, privacy: .public)] 全表示: \
+                    画面 \(screens.count, privacy: .public) 枚 placement \(placements.count, privacy: .public) 個
+                    """
+                )
+                controller.show(placements, appearance: .defaults)
+                if cycle == 0 {
+                    try await Task.sleep(for: Self.focusCheckDelay)
+                    Self.logFocusState()
+                    try await Task.sleep(for: Self.showDuration - Self.focusCheckDelay)
+                } else {
+                    try await Task.sleep(for: Self.showDuration)
+                }
+
+                Log.debug.notice(
+                    "--overlay-demo [周 \(cycle, privacy: .public)] 絞り込み: \(visible.count, privacy: .public) 個を残す"
+                )
+                controller.update(visibleIDs: visible)
+                try await Task.sleep(for: Self.filteredDuration)
+
+                Log.debug.notice("--overlay-demo [周 \(cycle, privacy: .public)] 非表示（hide を 2 回）")
+                controller.hide()
+                // 何も表示していないときに呼んでもよいこと（HintOverlayPresenting の約束）の確認
+                controller.hide()
+                try await Task.sleep(for: Self.hiddenDuration)
+                cycle += 1
             }
         }
 
-        /// 画面ごとにパネルを作ってラベルを出す。戻り値のパネルを持ち続けている間だけ表示が残る。
-        private static func present(_ snapshots: [ScreenSnapshot], reason: String) async throws -> [OverlayPanel] {
-            guard !snapshots.isEmpty else {
-                Log.debug.error("--overlay-demo [\(reason, privacy: .public)] 画面がないため表示しない")
-                return []
-            }
-            let alphabet = HintAlphabet.vimiumDefault
-            let labels = HintLabelGenerator.labels(count: columns * rows, alphabet: alphabet)
-            let panels = snapshots.map { snapshot in
-                let panel = OverlayPanel(screenFrame: snapshot.screen.frame)
-                panel.hintView.show(placements(for: snapshot.geometry, labels: labels), appearance: .defaults)
-                panel.present()
-                Log.debug.notice(
-                    """
-                    --overlay-demo [\(reason, privacy: .public)] \
-                    screen[\(snapshot.geometry.id.rawValue, privacy: .public)] ラベル \(labels.count, privacy: .public) 個 \
-                    screen.frame=\(format(snapshot.screen.frame), privacy: .public) \
-                    panel.frame=\(format(panel.frame), privacy: .public) \
-                    frame一致=\(panel.frame == snapshot.screen.frame, privacy: .public)
-                    """
-                )
-                return panel
-            }
-            try await Task.sleep(for: focusCheckDelay)
-            let anyKey = panels.contains { $0.isKeyWindow }
+        private static func logFocusState() {
+            let anyKey = NSApp.windows.contains { $0 is OverlayPanel && $0.isKeyWindow }
+            let panelFrames = NSApp.windows.compactMap { $0 as? OverlayPanel }.map { format($0.frame) }
+            let screenFrames = NSScreen.screens.map { format($0.frame) }
             Log.debug.notice(
                 """
                 --overlay-demo: NSApp.isActive=\(NSApp.isActive, privacy: .public) \
                 パネルがキー=\(anyKey, privacy: .public) \
-                前面のアプリ=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "不明", privacy: .public)
+                前面のアプリ=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "不明", privacy: .public) \
+                screen.frame=\(screenFrames.joined(separator: " "), privacy: .public) \
+                panel.frame=\(panelFrames.joined(separator: " "), privacy: .public)
                 """
             )
-            return panels
         }
 
         /// 画面ローカル座標（左上原点）の格子にラベルを置く。端の列・行は画面の端そのものに anchor を置く。
-        private static func placements(for screen: ScreenGeometry, labels: [String]) -> [HintPlacement] {
+        private func placements(for screen: ScreenGeometry, labels: [String]) -> [HintPlacement] {
             let size = screen.frame.rect.size
             return labels.enumerated().map { index, label in
-                let column = index % columns
-                let row = index / columns
+                let column = index % Self.columns
+                let row = index / Self.columns
                 let anchor = CGPoint(
-                    x: size.width * CGFloat(column) / CGFloat(columns - 1),
-                    y: size.height * CGFloat(row) / CGFloat(rows - 1)
+                    x: size.width * CGFloat(column) / CGFloat(Self.columns - 1),
+                    y: size.height * CGFloat(row) / CGFloat(Self.rows - 1)
                 )
                 return HintPlacement(
-                    // 画面をまたいで ID が重ならないようにする（T45 の絞り込みで画面ごとに区別できるように）
+                    // 画面をまたいで ID が重ならないようにする（絞り込みで画面ごとに区別できるように）
                     elementID: ElementID(rawValue: screen.id.rawValue * 1000 + index),
                     label: label,
                     screenID: screen.id,
                     anchor: anchor
                 )
             }
+        }
+
+        /// どの画面にも対応しない `ScreenID`（画面の数と同じ添字）の placement。
+        private func orphanPlacement(screenCount: Int) -> HintPlacement {
+            HintPlacement(
+                elementID: ElementID(rawValue: -1),
+                label: "orphan",
+                screenID: ScreenID(rawValue: screenCount),
+                anchor: .zero
+            )
         }
 
         private static func format(_ rect: CGRect) -> String {
