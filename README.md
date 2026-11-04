@@ -112,6 +112,10 @@ The settings window will let you change the following. It isn't finished yet.
     so links and other elements in pages and app screens get labels.
   - **Chrome and many other Electron apps** don't. Only the window frame, tabs and toolbar
     get labels, not the content inside. Support for these apps may come after the MVP.
+- **Apps that draw their own UI:** Some apps, such as WezTerm and many games, draw their
+  whole window themselves (for example with Metal) instead of using standard macOS controls.
+  They don't make their contents available to accessibility tools, so only the window frame
+  gets labels.
 - **Multiple displays:** Labels have been tested on a single display only. Tobi hasn't been
   tested yet with multiple displays, a mix of Retina and non-Retina displays, or the
   "Displays have separate Spaces" setting.
