@@ -6,7 +6,11 @@ import TobiCore
 ///
 /// 順序:
 /// 1. `lookUpElement` で `ElementID` から AX の参照を引く。なければ `ActionError.elementNotFound`
-/// 2. `AXActionNames` を読み、`AXPress` が**含まれていなければ** `AXPress` を送らずに代替クリックする
+/// 2. 汎用のロール（`TraversalPolicy.ambiguousRoles`: AXGroup・AXImage・AXCell・AXUnknown）は、`AXPress` を
+///    送らずに代替クリックする。これらは「押されたら何をするか」がアプリ任せで、`AXPress` に `success` を返しても
+///    何も起きないことがある（2026-11-05、VS Code のエディタ・ターミナルの AXGroup で判明。ユーザーが方針を承認）。
+///    F-5 の「左クリック」の意図（マウスで押したのと同じ結果）に合わせる
+/// 2'. それ以外は `AXActionNames` を読み、`AXPress` が**含まれていなければ** `AXPress` を送らずに代替クリックする
 /// 3. 含まれていれば（またはアクション名を読めなければ）`AXClient.press(_:)`（その参照に 1.0 秒のタイムアウトを
 ///    設定してから `AXPress`。D-29）
 /// 4. 失敗を `ActionError(pressFailure:)` で変換し、`allowsFallbackClick`（= `actionUnsupported`）のときだけ
@@ -78,6 +82,12 @@ struct AXActionPerformer: ActionPerforming {
     private func leftClick(_ element: CollectedElement) throws(ActionError) -> ActionMethod {
         guard let reference = lookUpElement(element.id) else {
             throw .elementNotFound(element.id)
+        }
+        if TraversalPolicy.ambiguousRoles.contains(element.role) {
+            guard let fallbackClick else { throw .actionUnsupported }
+            Log.action.debug("汎用のロールのため代替クリックにする。ロール: \(element.role, privacy: .public)")
+            try fallbackClick(element.frame)
+            return .mouseClick
         }
         if !advertisesPress(reference, role: element.role) {
             guard let fallbackClick else { throw .actionUnsupported }
