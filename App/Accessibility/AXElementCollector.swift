@@ -40,6 +40,11 @@ import os
 ///   テストし、親を辿って `AXMenu` を探す。frame が 1pt 以内で一致すれば、そのウィンドウの `WindowID` の根にする。
 ///   メニューバーのウィンドウに属させると、自分のメニューに遮蔽されて消えるため。
 /// - Dock、メニューバー右側（ステータスアイテム、コントロールセンター）、通知は、前面のアプリのものではないので走査しない。
+///
+/// シート（保存シートなど）: AX では親ウィンドウの子（`AXSheet`）で `AXWindows` に入らないが、CG では親より前面の別の
+/// ウィンドウになる。親の `WindowID` に属させると、自分のシートに遮蔽されて消える（8.6）。そこで、対応する AX
+/// ウィンドウがない CG のウィンドウが残ったときだけ、照合した AX ウィンドウの子からシートを探し、frame が 1pt 以内で
+/// 一致すれば、その CG のウィンドウの `WindowID` の根にする（D-9・D-31 と同じ考え方）。
 /// 相手のアプリの AX を有効にする属性（Chromium・Electron 向けのもの）は書き込まない（F-2.7）。
 ///
 /// スレッド: 状態は `registry`（ロック付き）だけなので、どの隔離から呼んでもよい。IPC はすべて GCD のキューで行い、
@@ -311,7 +316,8 @@ private final class CancellationFlag: Sendable {
 /// 2. 各 AX ウィンドウの `AXPosition` / `AXSize` / `AXMinimized` を 1 回の IPC で読み、最小化されておらず、frame が
 ///    CG のウィンドウの bounds と 1pt 以内で一致するものを、その `WindowID` の根にする（D-9）。一致しない AX
 ///    ウィンドウ（別の Space、画面外など）は捨てる。CG のウィンドウがすべて対応付いたら、残りの AX ウィンドウは読まない。
-/// 3. 根を前面から順（開いているメニュー、メニューバー、ウィンドウ）に `TreeWalker` で走査する。ノード数の上限は
+///    対応付かない CG のウィンドウが残ったら、照合した AX ウィンドウのシートと照合する（`resolveSheetRoots`）。
+/// 3. 根を前面から順（開いているメニュー、メニューバー、ウィンドウとシート）に `TreeWalker` で走査する。ノード数の上限は
 ///    アプリ単位なので、次の根には「4000 − それまでの `visitedNodeCount` の合計」を渡す（design.md 8.4、T23）。
 ///    終了理由が `completed` 以外（期限、上限、応答なし、キャンセル、権限の取り消し）なら、残りの根は走査しない。
 ///
@@ -344,8 +350,40 @@ private struct AppCollectionJob: Sendable {
             stopReason = error.reason
         }
 
+        let walked = walk(roots, state: &state, issues: issues)
+        if let reason = walked.stopReason {
+            stopReason = reason
+        }
+        let hits = walked.hits
+        let visited = walked.visitedNodeCount
+
+        let report = AppCollectionReport(
+            pid: plan.pid,
+            hitCount: hits.count,
+            visitedNodeCount: visited,
+            targetWindowCount: plan.targets.count,
+            rootCount: state.windowRootCount,
+            menus: state.menuReport,
+            sheets: state.sheetReport,
+            stopReason: stopReason,
+            readErrors: state.readErrors,
+            issues: issues.snapshot(),
+            elapsed: start.duration(to: clock.now)
+        )
+        return AppCollection(hits: hits, report: report)
+    }
+
+    /// `walk(_:state:issues:)` の結果。
+    private struct WalkOutcome {
         var hits: [AppHit] = []
-        var visited = 0
+        var visitedNodeCount = 0
+        /// `completed` 以外で止まった根があれば、その終了理由（残りの根は走査していない）。
+        var stopReason: WalkStopReason?
+    }
+
+    /// 根を前面から順に `TreeWalker` で走査する。ノード数の上限はアプリ単位で、根ごとに残りを渡す（型の説明の 3）。
+    private func walk(_ roots: [WalkRoot], state: inout JobState, issues: AXAttributeIssueCounter) -> WalkOutcome {
+        var outcome = WalkOutcome()
         let walker = TreeWalker(
             source: AXTreeSource(client: client, issues: issues),
             policy: policy,
@@ -356,33 +394,20 @@ private struct AppCollectionJob: Sendable {
                 root: root.element,
                 clip: root.clip,
                 deadline: deadline,
-                nodeBudget: TreeWalkerLimits.nodeBudgetPerApp - visited,
+                nodeBudget: TreeWalkerLimits.nodeBudgetPerApp - outcome.visitedNodeCount,
                 isCancelled: { flag.isCancelled }
             )
-            visited += result.visitedNodeCount
+            outcome.visitedNodeCount += result.visitedNodeCount
             state.readErrors.merge(result.readErrors, uniquingKeysWith: +)
-            hits += result.hits.map { hit in
+            outcome.hits += result.hits.map { hit in
                 AppHit(element: hit.node, windowID: root.windowID, frame: hit.frame, role: hit.role)
             }
             guard result.stopReason == .completed else {
-                stopReason = result.stopReason
+                outcome.stopReason = result.stopReason
                 break
             }
         }
-
-        let report = AppCollectionReport(
-            pid: plan.pid,
-            hitCount: hits.count,
-            visitedNodeCount: visited,
-            targetWindowCount: plan.targets.count,
-            rootCount: state.windowRootCount,
-            menus: state.menuReport,
-            stopReason: stopReason,
-            readErrors: state.readErrors,
-            issues: issues.snapshot(),
-            elapsed: start.duration(to: clock.now)
-        )
-        return AppCollection(hits: hits, report: report)
+        return outcome
     }
 
     // MARK: 根を決める
@@ -430,6 +455,8 @@ private struct AppCollectionJob: Sendable {
             let target = plan.targets[index]
             matched[index] = WalkRoot(element: axWindow, windowID: target.window.id, clip: target.clip)
         }
+        try resolveSheetRoots(&matched, state: &state, issues: issues)
+        // matched は plan.targets の順（前面から）なので、シートはその親ウィンドウより先に走査する
         let roots = matched.compactMap(\.self)
         state.windowRootCount = roots.count
         return roots
@@ -529,8 +556,9 @@ private struct AppCollectionJob: Sendable {
 
 /// `AppCollectionJob` のうち、前面のアプリのメニューバーと開いているメニューの根を決める部分（型の本体が長くなるため分けた）。
 extension AppCollectionJob {
-    /// 開いているメニューを探すとき、ヒットテストで得た要素とその祖先で 1 回の IPC で読む属性。
-    static let menuSearchAttributes: [String] = [
+    /// 開いているメニューとシートを探すとき、候補の要素（ヒットテストで得た要素とその祖先、ウィンドウの子）で
+    /// 1 回の IPC で読む属性。
+    static let candidateNodeAttributes: [String] = [
         kAXRoleAttribute, kAXPositionAttribute, kAXSizeAttribute, kAXParentAttribute,
     ]
     /// ヒットテストで得た要素から `AXMenu` を探して辿る親の数の上限。メニューの中のヒットは `AXMenuItem`（またはその
@@ -626,7 +654,7 @@ extension AppCollectionJob {
         state.succeeded()
 
         for _ in 0...Self.menuSearchParentLimit {
-            guard let node = try readMenuSearchNode(current, state: &state, issues: issues) else { return nil }
+            guard let node = try readCandidateNode(current, state: &state, issues: issues) else { return nil }
             if node.role == kAXMenuRole {
                 guard let frame = node.frame, Self.framesMatch(frame, windowFrame) else { return nil }
                 return WalkRoot(element: current, windowID: target.window.id, clip: target.clip)
@@ -637,23 +665,23 @@ extension AppCollectionJob {
         return nil
     }
 
-    /// `AXMenu` を探すために読む 1 要素の属性。
-    private struct MenuSearchNode {
+    /// `AXMenu` と `AXSheet` を探すために読む 1 要素の属性。
+    private struct CandidateNode {
         let role: String?
         let frame: CGRect?
         let parent: AXElementRef?
     }
 
-    /// ヒットテストの要素か祖先の、ロール・frame・親を 1 回の IPC で読む。読めなければ nil。
-    private func readMenuSearchNode(
+    /// 候補の要素の、ロール・frame・親を 1 回の IPC で読む。読めなければ nil。
+    private func readCandidateNode(
         _ element: AXElementRef,
         state: inout JobState,
         issues: AXAttributeIssueCounter
-    ) throws(JobInterruption) -> MenuSearchNode? {
+    ) throws(JobInterruption) -> CandidateNode? {
         try checkBeforeIPC()
         do throws(AccessibilityReadError) {
             try setTimeoutIfNeeded(on: element)
-            let values = try client.attributeValues(Self.menuSearchAttributes, of: element)
+            let values = try client.attributeValues(Self.candidateNodeAttributes, of: element)
             state.succeeded()
             let role = try Self.slot(kAXRoleAttribute, issues: issues) { () throws(AXValueDecodingError) in
                 try values.string(kAXRoleAttribute)
@@ -668,7 +696,7 @@ extension AppCollectionJob {
                 try values.raw(kAXParentAttribute)
             }
             let frame = position.flatMap { position in size.map { CGRect(origin: position, size: $0) } }
-            return MenuSearchNode(
+            return CandidateNode(
                 role: role,
                 frame: frame,
                 parent: parentValue.flatMap { Self.element($0, attribute: kAXParentAttribute) }
@@ -712,6 +740,100 @@ extension AppCollectionJob {
     }
 }
 
+// MARK: - シートの根を決める
+
+/// `AppCollectionJob` のうち、シート（`AXSheet`）の根を決める部分（型の本体が長くなるため分けた）。
+extension AppCollectionJob {
+    /// ウィンドウのシートの一覧。SDK に定数がない属性なので名前で持つ。持たないアプリでは `AXChildren` を使う。
+    static let sheetsAttribute = "AXSheets"
+    /// シートを探すとき、照合した AX ウィンドウで 1 回の IPC で読む属性。
+    static let sheetListAttributes: [String] = [sheetsAttribute, kAXChildrenAttribute]
+
+    /// 対応する AX ウィンドウがない CG のウィンドウを、照合した AX ウィンドウ（前面から順）のシートと照合し、
+    /// 一致したら `matched` のその位置にシートの根を入れる。
+    ///
+    /// シートは CG では別のウィンドウなので、`AXWindows` との照合では対応付かずに残る。残りがないときは何も読まない
+    /// （シートを開いていない、ほとんどの場合に IPC を増やさないため）。シートの CG のウィンドウは親と同じレイヤー 0 で、
+    /// `plan.targets` に入っている（覆われている・画面外なら、走査しなくてよいので入っていない）。
+    ///
+    /// 親ウィンドウの根からもシートの中は辿るが、その要素は親の `WindowID` に属し、前面のシートのウィンドウに覆われて
+    /// 遮蔽で除かれるので、ラベルは二重にならない（8.6）。
+    private func resolveSheetRoots(
+        _ matched: inout [WalkRoot?],
+        state: inout JobState,
+        issues: AXAttributeIssueCounter
+    ) throws(JobInterruption) {
+        guard matched.contains(where: { $0 == nil }) else { return }
+        let parents = matched.compactMap(\.self)
+        guard !parents.isEmpty else { return }
+        var report = SheetRootReport()
+        // 途中で打ち切られても、それまでの内訳は残す
+        defer { state.sheetReport = report }
+
+        for parent in parents where matched.contains(where: { $0 == nil }) {
+            guard let list = try readSheetCandidates(of: parent.element, state: &state, issues: issues) else {
+                continue
+            }
+            report.record(list.source)
+            for candidate in list.elements where matched.contains(where: { $0 == nil }) {
+                guard let node = try readCandidateNode(candidate, state: &state, issues: issues),
+                    node.role == kAXSheetRole,
+                    let frame = node.frame
+                else { continue }
+                let index = plan.targets.indices.first { index in
+                    matched[index] == nil && Self.framesMatch(frame, plan.targets[index].window.frame.rect)
+                }
+                guard let index else { continue }
+                let target = plan.targets[index]
+                matched[index] = WalkRoot(element: candidate, windowID: target.window.id, clip: target.clip)
+                report.rootCount += 1
+            }
+        }
+    }
+
+    /// シートの候補の一覧と、どの属性から得たか。
+    private struct SheetCandidates {
+        let source: SheetListSource
+        let elements: [AXElementRef]
+    }
+
+    /// AX ウィンドウのシートの候補を読む。`AXSheets` があればそれ、なければ `AXChildren`（ロールは呼び出し側で確かめる）。
+    /// どちらも読めなければ nil。
+    private func readSheetCandidates(
+        of window: AXElementRef,
+        state: inout JobState,
+        issues: AXAttributeIssueCounter
+    ) throws(JobInterruption) -> SheetCandidates? {
+        try checkBeforeIPC()
+        do throws(AccessibilityReadError) {
+            try setTimeoutIfNeeded(on: window)
+            let values = try client.attributeValues(Self.sheetListAttributes, of: window)
+            state.succeeded()
+            if let sheets = try Self.slot(
+                Self.sheetsAttribute, issues: issues,
+                { () throws(AXValueDecodingError) in
+                    try values.elements(Self.sheetsAttribute)
+                })
+            {
+                return SheetCandidates(source: .sheetsAttribute, elements: sheets)
+            }
+            let children = try Self.slot(kAXChildrenAttribute, issues: issues) { () throws(AXValueDecodingError) in
+                try values.elements(kAXChildrenAttribute)
+            }
+            return children.map { SheetCandidates(source: .children, elements: $0) }
+        } catch {
+            try state.fail(error)
+            return nil
+        }
+    }
+}
+
+/// シートの候補を得た属性。
+private enum SheetListSource {
+    case sheetsAttribute
+    case children
+}
+
 /// アプリ 1 つの走査を途中で止める理由（`WalkStopReason` のうち `completed` 以外）。
 private struct JobInterruption: Error {
     let reason: WalkStopReason
@@ -721,10 +843,12 @@ private struct JobInterruption: Error {
 private struct JobState {
     /// 根を決める段階と `TreeWalker` の読み取りの失敗の件数（`CollectionDiagnostic.readFailed` の元）。
     var readErrors: [AccessibilityReadError: Int] = [:]
-    /// AX ウィンドウと対応付いて根になったウィンドウの数（メニューの根は含めない）。
+    /// AX ウィンドウかシートと対応付いて根になったウィンドウの数（メニューの根は含めない）。
     var windowRootCount = 0
     /// 前面のアプリだけ。メニューの根の対応付けの内訳。
     var menuReport: MenuRootReport?
+    /// シートを探したときだけ。シートの根の対応付けの内訳。
+    var sheetReport: SheetRootReport?
     private var consecutiveCannotComplete = 0
 
     mutating func succeeded() {
@@ -830,11 +954,13 @@ struct AppCollectionReport: Sendable {
     let visitedNodeCount: Int
     /// 走査しようとした CG のウィンドウの数。
     let targetWindowCount: Int
-    /// AX ウィンドウと対応付いて走査の根になった数（`targetWindowCount` との差は対応付かなかったウィンドウ）。
-    /// メニューの根は含めない（`menus`）。
+    /// AX ウィンドウかシートと対応付いて走査の根になった数（`targetWindowCount` との差は対応付かなかったウィンドウ）。
+    /// シートの根を含む（内訳は `sheets`）。メニューの根は含めない（`menus`）。
     let rootCount: Int
     /// 前面のアプリだけ。メニューバーと開いているメニューの根の内訳（前面のアプリでなければ nil）。
     let menus: MenuRootReport?
+    /// シートを探したときだけ（`AXWindows` と対応付かない CG のウィンドウが残ったとき）。シートの根の内訳。
+    let sheets: SheetRootReport?
     let stopReason: WalkStopReason
     let readErrors: [AccessibilityReadError: Int]
     /// 「属性なし」として扱った読み取り（型の不一致など）。TobiCore の診断には入れず、ログにだけ出す（T41 の申し送り）。
@@ -855,6 +981,9 @@ struct AppCollectionReport: Sendable {
         ]
         if let menus {
             lines.append("    \(menus.logLine)")
+        }
+        if let sheets {
+            lines.append("    \(sheets.logLine)")
         }
         for (error, count) in sortedReadErrors {
             lines.append("    readError \(error): \(count)")
@@ -883,5 +1012,28 @@ struct MenuRootReport: Sendable {
     var logLine: String {
         "メニュー: メニューバー \(hasMenuBarRoot ? "あり" : "なし")（ウィンドウ \(menuBarWindowCount) 枚）、"
             + "開いているメニュー 根 \(popUpMenuRootCount)/\(popUpMenuWindowCount)"
+    }
+}
+
+/// シートの根の対応付けの内訳。シートにラベルが付かないときに、シートが根になったか、どの属性から見つけたかを
+/// `--collect-once` で見るためにログへ出す。
+struct SheetRootReport: Sendable {
+    /// `AXSheets` からシートの候補を読んだ AX ウィンドウの数。
+    var sheetsAttributeWindowCount = 0
+    /// `AXSheets` がなく、`AXChildren` からシートの候補を読んだ AX ウィンドウの数。
+    var childrenWindowCount = 0
+    /// CG のウィンドウと対応付いて根になったシートの数。
+    var rootCount = 0
+
+    fileprivate mutating func record(_ source: SheetListSource) {
+        switch source {
+        case .sheetsAttribute: sheetsAttributeWindowCount += 1
+        case .children: childrenWindowCount += 1
+        }
+    }
+
+    var logLine: String {
+        "シート: 根 \(rootCount)、候補を読んだウィンドウ AXSheets \(sheetsAttributeWindowCount) 枚・"
+            + "AXChildren \(childrenWindowCount) 枚"
     }
 }
