@@ -6,14 +6,18 @@ import TobiCore
 ///
 /// 順序:
 /// 1. `lookUpElement` で `ElementID` から AX の参照を引く。なければ `ActionError.elementNotFound`
-/// 2. `AXClient.press(_:)`（その参照に 1.0 秒のタイムアウトを設定してから `AXPress`。D-29）
-/// 3. 失敗を `ActionError(pressFailure:)` で変換し、`allowsFallbackClick`（= `actionUnsupported`）のときだけ
+/// 2. `AXActionNames` を読み、`AXPress` が**含まれていなければ** `AXPress` を送らずに代替クリックする
+/// 3. 含まれていれば（またはアクション名を読めなければ）`AXClient.press(_:)`（その参照に 1.0 秒のタイムアウトを
+///    設定してから `AXPress`。D-29）
+/// 4. 失敗を `ActionError(pressFailure:)` で変換し、`allowsFallbackClick`（= `actionUnsupported`）のときだけ
 ///    `fallbackClick` で要素の中心をクリックする。それ以外の失敗は代替せずに投げる（`cannotComplete` は
 ///    相手のアプリで操作が実行済みのことがあり、代替すると二重に操作するおそれがある。Q-19）
-/// 4. `fallbackClick` が `nil`（未注入）なら `.actionUnsupported` を投げる（T28 の取り決め）
+/// 5. `fallbackClick` が `nil`（未注入）なら `.actionUnsupported` を投げる（T28 の取り決め）
 ///
-/// - `AXActionNames` を先に読んで `AXPress` を省く最適化はしない（`actionUnsupported` は 0.1〜0.3ms で返り、
-///   アクション名の読み取りも IPC 1 回なので節約にならない。design.md 10 章、V-4）。
+/// - 手順 2 は最適化ではなく正しさのために必要（2026-11-05、実機で判明）。Finder の一覧のファイル名の欄
+///   （`AXTextField`）は、`AXActionNames` に `AXPress` がないのに `AXPress` へ `success` を返し、何もしない。
+///   そのため `actionUnsupported` を待つだけでは代替クリックに切り替わらない（V-4 では Safari のアドレス欄が
+///   正しく `actionUnsupported` を返していたので、この場合を見落としていた）。増える IPC は確定時の 1 回だけ。
 /// - 対象アプリのアクティブ化やウィンドウを前面に出す処理はしない（暫定 Q-18）。
 ///
 /// スレッド: `AXPress` はモーダルダイアログを開くと相手のアプリが応答するまでブロックするため、
@@ -75,6 +79,13 @@ struct AXActionPerformer: ActionPerforming {
         guard let reference = lookUpElement(element.id) else {
             throw .elementNotFound(element.id)
         }
+        if !advertisesPress(reference, role: element.role) {
+            guard let fallbackClick else { throw .actionUnsupported }
+            Log.action.debug(
+                "AXActionNames に AXPress がないため代替クリックにする。ロール: \(element.role, privacy: .public)")
+            try fallbackClick(element.frame)
+            return .mouseClick
+        }
         do throws(AccessibilityReadError) {
             try client.press(reference)
             return .axPress
@@ -90,5 +101,31 @@ struct AXActionPerformer: ActionPerforming {
             try fallbackClick(element.frame)
             return .mouseClick
         }
+    }
+
+    /// 要素の `AXActionNames` に `AXPress` があるか。
+    ///
+    /// アクション名を読めない・解釈できないときは `true` を返して `AXPress` を試す（従来の経路）。
+    /// 読めないことは黙って捨てず、理由を `Log.action` に残す。`AXPress` が `actionUnsupported` を返せば
+    /// 手順 4 で代替クリックに切り替わるので、ここで止めずに先へ進めてよい。
+    private func advertisesPress(_ reference: AXElementRef, role: String) -> Bool {
+        let names: [String]
+        do throws(AccessibilityReadError) {
+            let raw = try client.actionNames(of: reference)
+            do throws(AXValueDecodingError) {
+                names = try AXValueDecoder.strings(raw)
+            } catch {
+                Log.action.notice(
+                    "アクション名を解釈できず AXPress を試す: \(String(describing: error), privacy: .public) \(role, privacy: .public)"
+                )
+                return true
+            }
+        } catch {
+            Log.action.notice(
+                "アクション名を読めず AXPress を試す: \(String(describing: error), privacy: .public) \(role, privacy: .public)"
+            )
+            return true
+        }
+        return names.contains(TraversalPolicy.pressAction)
     }
 }
