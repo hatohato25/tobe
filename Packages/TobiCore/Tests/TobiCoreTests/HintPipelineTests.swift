@@ -52,7 +52,7 @@ struct HintPipelineLabelingTests {
     func empty() {
         let output = HintPipeline.makeHints(from: result(windows: [], elements: []), alphabet: .vimiumDefault)
 
-        #expect(output == HintPipelineResult(hints: [], truncatedCount: 0))
+        #expect(output == HintPipelineResult(hints: [], truncatedCount: 0, removedNestedRowCount: 0))
     }
 
     @Test("ウィンドウはあるが要素がない場合も空を返す")
@@ -232,7 +232,7 @@ struct HintPipelinePerformanceTests {
         let input = result(windows: [front, back], elements: elements.reversed())
 
         let clock = ContinuousClock()
-        var output = HintPipelineResult(hints: [], truncatedCount: 0)
+        var output = HintPipelineResult(hints: [], truncatedCount: 0, removedNestedRowCount: 0)
         let elapsed = clock.measure {
             output = HintPipeline.makeHints(from: input, alphabet: .vimiumDefault)
         }
