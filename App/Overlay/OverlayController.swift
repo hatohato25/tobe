@@ -30,10 +30,30 @@ final class OverlayController: HintOverlayPresenting {
     private var panels: [ScreenID: OverlayPanel] = [:]
     /// `show` から `hide` までの間 true。作り直しのときに、表示中だったかをログに出すためだけに使う。
     private var isShowing = false
+    /// デスクトップ（Space）が切り替わってから、まだパネルを作り直していないとき true。
+    /// 一度 `orderOut` したパネルは、別のデスクトップで出し直すと最初に表示したデスクトップに出てしまうため
+    /// （2026-11-05、macOS 27 の実機で判明）、次の `show` の前に作り直す。
+    private var spaceChangedSinceLastShow = false
+    private var spaceObserver: (any NSObjectProtocol)?
 
     /// `screens` の画面ごとにパネルを作る（まだ画面には出さない）。`screens` が空ならパネルは 0 枚。
     init(screens: [ScreenSnapshot]) {
         panels = Self.makePanels(for: screens)
+        spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.spaceChangedSinceLastShow = true
+            }
+        }
+    }
+
+    isolated deinit {
+        if let spaceObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver)
+        }
     }
 
     /// 画面の構成が変わったときに、パネルをすべて作り直す。
@@ -56,6 +76,9 @@ final class OverlayController: HintOverlayPresenting {
     }
 
     func show(_ placements: [HintPlacement], appearance: LabelAppearance) {
+        if spaceChangedSinceLastShow {
+            recreatePanelsForActiveSpace()
+        }
         let byScreen = Dictionary(grouping: placements, by: \.screenID)
         let orphans = byScreen.filter { panels[$0.key] == nil }
         if !orphans.isEmpty {
@@ -78,8 +101,49 @@ final class OverlayController: HintOverlayPresenting {
             // present() は先に描画を済ませてから出すので、show を先に呼ぶ（T44）
             panel.hintView.show(onThisScreen, appearance: appearance)
             panel.present()
+            if !panel.isOnActiveSpace {
+                panels[screenID] = replacePanelOffActiveSpace(panel, placements: onThisScreen, appearance: appearance)
+            }
         }
         isShowing = true
+    }
+
+    /// デスクトップが切り替わった後、表示の前にパネルを同じ frame で作り直す（画面の構成は変わっていない）。
+    private func recreatePanelsForActiveSpace() {
+        spaceChangedSinceLastShow = false
+        for (screenID, panel) in panels {
+            let frame = panel.frame
+            panel.dismiss()
+            panel.hintView.clear()
+            panel.close()
+            panels[screenID] = OverlayPanel(screenFrame: frame)
+        }
+        Log.overlay.info("デスクトップが切り替わったため、パネルを作り直した（\(self.panels.count, privacy: .public) 枚）")
+    }
+
+    /// 今のデスクトップ（Space）に出なかったパネルを作り直して出し直す（上の作り直しをしても出なかった場合の保険）。
+    ///
+    /// `canJoinAllSpaces` のパネルでも、一度 `orderOut` したものを別のデスクトップで `orderFrontRegardless` すると、
+    /// 最初に表示したデスクトップに出てしまう（2026-11-05、macOS 27 の実機で判明。作ったばかりのパネルは
+    /// 今のデスクトップに出る。V-8）。パネルの frame は画面の frame のまま（`constrainFrameRect` で固定）なので、
+    /// 同じ frame で作り直せば同じ画面に出る。
+    private func replacePanelOffActiveSpace(
+        _ panel: OverlayPanel,
+        placements: [HintPlacement],
+        appearance: LabelAppearance
+    ) -> OverlayPanel {
+        Log.overlay.notice("パネルが今のデスクトップに出なかったため、作り直して出し直す")
+        let frame = panel.frame
+        panel.dismiss()
+        panel.hintView.clear()
+        panel.close()
+        let replacement = OverlayPanel(screenFrame: frame)
+        replacement.hintView.show(placements, appearance: appearance)
+        replacement.present()
+        if !replacement.isOnActiveSpace {
+            Log.overlay.error("作り直したパネルも今のデスクトップに出なかった")
+        }
+        return replacement
     }
 
     func update(visibleIDs: Set<ElementID>) {
