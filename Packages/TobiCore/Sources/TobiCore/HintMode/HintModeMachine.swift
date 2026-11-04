@@ -120,7 +120,7 @@ public struct HintModeMachine: Sendable {
             var next = context
             next.typed = typed
             state = .selecting(next)
-            return [.updateHints(visible: Set(candidates.map(\.element.id)))]
+            return [.updateHints(visible: Set(candidates.map(\.element.id)), typed: typed)]
         case .noMatch:
             // 一致しない文字は無視し、入力済みの文字列も変えない（暫定 Q-6）
             return []
@@ -133,6 +133,6 @@ public struct HintModeMachine: Sendable {
         var next = context
         next.typed.removeLast()
         state = .selecting(next)
-        return [.updateHints(visible: Set(next.visibleHints.map(\.element.id)))]
+        return [.updateHints(visible: Set(next.visibleHints.map(\.element.id)), typed: next.typed)]
     }
 }

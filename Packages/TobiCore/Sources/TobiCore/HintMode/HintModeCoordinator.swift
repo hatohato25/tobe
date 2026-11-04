@@ -154,8 +154,8 @@ public final class HintModeCoordinator {
             log(.hintsTruncated(count: count))
         case .showHints(let hints):
             showHints(hints)
-        case .updateHints(let visible):
-            overlay.update(visibleIDs: visible)
+        case .updateHints(let visible, let typed):
+            overlay.update(visibleIDs: visible, typedCount: typed.count)
         case .hideHints:
             overlay.hide()
         case .perform(let action, let element):

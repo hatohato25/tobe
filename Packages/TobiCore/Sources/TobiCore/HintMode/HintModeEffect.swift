@@ -15,8 +15,11 @@ public enum HintModeEffect: Equatable, Sendable {
     case reportTruncatedHints(count: Int)
     /// ラベルを表示する（`HintOverlayPresenting.show`）。1 件以上。
     case showHints([Hint])
-    /// 絞り込みの結果を反映する（`HintOverlayPresenting.update(visibleIDs:)`。F-4）。
-    case updateHints(visible: Set<ElementID>)
+    /// 絞り込みの結果を反映する（`HintOverlayPresenting.update(visibleIDs:typedCount:)`。F-4）。
+    ///
+    /// `typed` は反映した後の入力済みの文字列（`SelectionContext.typed`。空もありうる）。表示中のラベルはすべて
+    /// `typed` を接頭辞に持つので、オーバーレイは先頭の `typed.count` 文字を入力済みとして薄く描く。
+    case updateHints(visible: Set<ElementID>, typed: String)
     /// すべてのラベルを隠す（`HintOverlayPresenting.hide()`）。
     case hideHints
     /// 確定した要素を操作する（`ActionPerforming.perform`。F-5）。

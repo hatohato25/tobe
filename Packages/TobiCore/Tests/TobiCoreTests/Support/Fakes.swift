@@ -10,7 +10,7 @@ final class CallJournal: Sendable {
         case setSuppressing(Bool)
         case collect
         case show(count: Int)
-        case update(Set<ElementID>)
+        case update(Set<ElementID>, typedCount: Int)
         case hide
         case perform(HintAction, ElementID)
         case playFailure
@@ -150,8 +150,8 @@ final class FakeOverlay: HintOverlayPresenting {
         journal.append(.show(count: placements.count))
     }
 
-    func update(visibleIDs: Set<ElementID>) {
-        journal.append(.update(visibleIDs))
+    func update(visibleIDs: Set<ElementID>, typedCount: Int) {
+        journal.append(.update(visibleIDs, typedCount: typedCount))
     }
 
     func hide() {

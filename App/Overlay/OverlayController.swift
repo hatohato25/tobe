@@ -6,7 +6,8 @@ import TobiCore
 /// - パネルは画面ごとに 1 枚。生成時と `rebuildPanels(for:)` のときにだけ作り、ヒントモードのたびに使い回す（N-1）。
 /// - `show` は placements を `screenID` で振り分けて、ラベルのある画面のパネルだけを出す。対応するパネルのない
 ///   placement（画面の構成が変わった直後の古い `ScreenID` など）は捨てるが、件数を `Log.overlay` に出す。
-/// - `update(visibleIDs:)` は全パネルのビューに集合を渡して再描画するだけ（位置と実寸は変えない。F-4）。
+/// - `update(visibleIDs:typedCount:)` は全パネルのビューに集合と入力済みの文字数を渡して再描画するだけ
+///   （位置と実寸は変えない。F-4）。入力済みの文字はビューが薄く描く。
 /// - `hide` は全パネルを外し、ビューのラベルも消す。何も表示していないときに呼んでもよい。
 /// - 描画完了の signpost（`Signposts.rendered()`）は `HintOverlayView.draw` が打つので、ここでは打たない。
 ///
@@ -18,7 +19,7 @@ import TobiCore
 /// ```swift
 /// let controller = OverlayController(screens: provider.currentSnapshots())
 /// controller.show(placements, appearance: appearance)   // HintPlacement.place の結果
-/// controller.update(visibleIDs: ids)
+/// controller.update(visibleIDs: ids, typedCount: 1)   // 1 文字入力した後の絞り込み
 /// controller.hide()
 /// controller.rebuildPanels(for: provider.currentSnapshots())   // 画面の構成が変わったら
 /// ```
@@ -146,10 +147,11 @@ final class OverlayController: HintOverlayPresenting {
         return replacement
     }
 
-    func update(visibleIDs: Set<ElementID>) {
+    func update(visibleIDs: Set<ElementID>, typedCount: Int) {
         // 他の画面の ID が混ざっていても、各ビューは自分のラベルの ID だけを見るので、そのまま全ビューに渡す
         for panel in panels.values {
-            panel.hintView.update(visibleIDs: visibleIDs)
+            // 入力済みの文字数は表示中のすべてのラベルで共通（接頭辞で絞り込んでいるため）なので、全ビューに同じ値を渡す
+            panel.hintView.update(visibleIDs: visibleIDs, typedCount: typedCount)
         }
     }
 

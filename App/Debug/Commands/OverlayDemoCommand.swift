@@ -8,7 +8,8 @@
     /// - `OverlayController`（T45）を通して表示する。画面ごとに 5 列 × 4 行の格子にラベルを置く。格子の端の列・行は
     ///   画面の右端・下端に anchor を置くので、`HintPlacement.clamp` で画面内に押し戻されて、角と辺にぴったり接して
     ///   見える（F-3.5）。上端の行はメニューバーに重なる（`constrainFrameRect` の override と `.screenSaver`。V-8）。
-    /// - 1 周（約 8 秒）: 全表示（3 秒）→ 偶数番目だけに絞り込み（`update`。3 秒）→ 非表示（`hide` を 2 回。2 秒）。
+    /// - 1 周（約 11 秒）: 全表示（3 秒）→ 1 文字入力した状態に絞り込み（`update`。3 秒）→ Backspace で戻した状態
+    ///   （`update` で全ラベル・入力済み 0 文字。薄くした文字が元に戻る。3 秒）→ 非表示（`hide` を 2 回。2 秒）。
     ///   周ごとに画面の一覧を読み直して出し直す。
     /// - 最初の周だけ、存在しない画面の placement を 1 つ混ぜる（`OverlayController` が捨ててエラーログを出すことの確認）。
     /// - 最初の表示の 1 秒後に、Tobi がアクティブになっていないこととパネルがキーになっていないことをログに出す（F-3.7）。
@@ -21,6 +22,7 @@
         private static let focusCheckDelay: Duration = .seconds(1)
         private static let showDuration: Duration = .seconds(3)
         private static let filteredDuration: Duration = .seconds(3)
+        private static let restoredDuration: Duration = .seconds(3)
         private static let hiddenDuration: Duration = .seconds(2)
 
         func run() async throws {
@@ -36,6 +38,13 @@
             defer { watcher.cancel() }
 
             let labels = HintLabelGenerator.labels(count: Self.columns * Self.rows, alphabet: .vimiumDefault)
+            // 2 文字以上のラベルのうち、最初のラベルの 1 文字目を打った状態を見せる（実際の絞り込みと同じく接頭辞で残す）。
+            // 20 個は既定の文字セット（14 文字）より多いので、2 文字のラベルが必ずできる
+            guard let twoCharacterLabel = labels.first(where: { $0.count >= 2 }) else {
+                Log.debug.error("--overlay-demo: 2 文字以上のラベルがないため、入力済みの文字を見せられない")
+                return
+            }
+            let typed = String(twoCharacterLabel.prefix(1))
             var cycle = 0
             while true {
                 // ScreenID は添字なので、周ごとに読み直す（画面の構成の変化の後に古い ID を使わない）
@@ -44,9 +53,6 @@
                 if cycle == 0 {
                     placements.append(orphanPlacement(screenCount: screens.count))
                 }
-                let visible = Set(
-                    placements.enumerated().filter { $0.offset.isMultiple(of: 2) }.map { $0.element.elementID }
-                )
 
                 Log.debug.notice(
                     """
@@ -63,11 +69,7 @@
                     try await Task.sleep(for: Self.showDuration)
                 }
 
-                Log.debug.notice(
-                    "--overlay-demo [周 \(cycle, privacy: .public)] 絞り込み: \(visible.count, privacy: .public) 個を残す"
-                )
-                controller.update(visibleIDs: visible)
-                try await Task.sleep(for: Self.filteredDuration)
+                try await Self.narrowAndRestore(controller, placements: placements, typed: typed, cycle: cycle)
 
                 Log.debug.notice("--overlay-demo [周 \(cycle, privacy: .public)] 非表示（hide を 2 回）")
                 controller.hide()
@@ -76,6 +78,29 @@
                 try await Task.sleep(for: Self.hiddenDuration)
                 cycle += 1
             }
+        }
+
+        /// `typed` を入力した状態に絞り込み（入力済みの文字を薄く描く）、次に Backspace で戻した状態（全表示、
+        /// 入力 0 文字）にする。それぞれの状態を一定時間見せる。
+        private static func narrowAndRestore(
+            _ controller: OverlayController,
+            placements: [HintPlacement],
+            typed: String,
+            cycle: Int
+        ) async throws {
+            let visible = Set(placements.filter { $0.label.hasPrefix(typed) }.map(\.elementID))
+            Log.debug.notice(
+                """
+                --overlay-demo [周 \(cycle, privacy: .public)] 絞り込み: \
+                \(typed.count, privacy: .public) 文字入力して \(visible.count, privacy: .public) 個を残す
+                """
+            )
+            controller.update(visibleIDs: visible, typedCount: typed.count)
+            try await Task.sleep(for: filteredDuration)
+
+            Log.debug.notice("--overlay-demo [周 \(cycle, privacy: .public)] Backspace で戻した状態（全表示、入力 0 文字）")
+            controller.update(visibleIDs: Set(placements.map(\.elementID)), typedCount: 0)
+            try await Task.sleep(for: restoredDuration)
         }
 
         private static func logFocusState() {

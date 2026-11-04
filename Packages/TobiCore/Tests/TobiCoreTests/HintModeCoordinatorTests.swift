@@ -116,7 +116,7 @@ struct HintModeCoordinatorFlowTests {
 
         #expect(
             Array(harness.entries.dropFirst(beforeKeys)) == [
-                .update(Set(narrowed)),
+                .update(Set(narrowed), typedCount: 1),
                 // 確定はオーバーレイを消し、キー破棄を解いてから操作する（F-5.4）
                 .hide,
                 .setSuppressing(false),
@@ -125,6 +125,25 @@ struct HintModeCoordinatorFlowTests {
             ]
         )
         #expect(harness.coordinator.state == .idle)
+    }
+
+    @Test("絞り込みと backspace のたびに、入力済みの文字数をオーバーレイに渡す")
+    func passesTypedCountToOverlay() async throws {
+        let harness = CoordinatorHarness(settings: try settings(alphabet: HintModeFixtures.sadf()))
+        let before = await harness.startSelecting(with: HintModeFixtures.result(elementCount: 6))
+        let all = try ["a", "sa", "d", "sd", "f", "ss"].map { try harness.elementID(labeled: $0) }
+        let narrowed = try ["sa", "sd", "ss"].map { try harness.elementID(labeled: $0) }
+
+        harness.coordinator.keyPressed(.character("s"))
+        harness.coordinator.keyPressed(.backspace)
+
+        #expect(
+            Array(harness.entries.dropFirst(before)) == [
+                .update(Set(narrowed), typedCount: 1),
+                // 戻したら入力済みの文字はなくなる（薄くした文字を元に戻す）
+                .update(Set(all), typedCount: 0),
+            ]
+        )
     }
 
     @Test("収集の期限は、起動した時刻の 150ms 後")

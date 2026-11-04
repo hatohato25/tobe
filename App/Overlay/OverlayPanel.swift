@@ -13,7 +13,7 @@ import AppKit
 /// let panel = OverlayPanel(screenFrame: snapshot.screen.frame)
 /// panel.hintView.show(placementsOnThisScreen, appearance: appearance)
 /// panel.present()
-/// panel.hintView.update(visibleIDs: ids)   // 絞り込み
+/// panel.hintView.update(visibleIDs: ids, typedCount: n)   // 絞り込み
 /// panel.dismiss()
 /// ```
 ///

@@ -27,7 +27,7 @@ struct HintModeMachineSelectingCharacterTests {
         #expect(effects == [.hideHints, .setKeySuppression(false), .perform(.leftClick, target.element)])
     }
 
-    @Test("候補が絞られる → selecting(typed + c)。残った候補の ID で updateHints")
+    @Test("候補が絞られる → selecting(typed + c)。残った候補の ID と入力済みの文字列で updateHints")
     func narrowUpdatesHints() throws {
         var machine = try HintModeFixtures.selecting(elementCount: 6, alphabet: try HintModeFixtures.sadf())
         let expected = try ["sa", "sd", "ss"].map { try HintModeFixtures.hint(labeled: $0, in: machine) }
@@ -37,7 +37,7 @@ struct HintModeMachineSelectingCharacterTests {
         let context = try HintModeFixtures.selectionContext(of: machine)
         #expect(context.typed == "s")
         #expect(HintModeFixtures.ids(context.visibleHints) == HintModeFixtures.ids(expected))
-        #expect(effects == [.updateHints(visible: HintModeFixtures.ids(expected))])
+        #expect(effects == [.updateHints(visible: HintModeFixtures.ids(expected), typed: "s")])
     }
 
     @Test("一致しない文字 → selecting のまま（typed も変えない）、エフェクトなし（Q-6）")
@@ -92,7 +92,7 @@ struct HintModeMachineSelectingCharacterTests {
 
 @Suite("HintModeMachine: selecting のその他の入力（design.md 5.2）")
 struct HintModeMachineSelectingOtherTests {
-    @Test("backspace（typed が空でない）→ 末尾を消した selecting。消した後の候補で updateHints（F-6.3）")
+    @Test("backspace（typed が空でない）→ 末尾を消した selecting。消した後の候補と文字列で updateHints（F-6.3）")
     func backspaceRestoresCandidates() throws {
         var machine = try HintModeFixtures.selecting(elementCount: 6, alphabet: try HintModeFixtures.sadf())
         let all = try HintModeFixtures.selectionContext(of: machine).hints
@@ -103,7 +103,26 @@ struct HintModeMachineSelectingOtherTests {
         let context = try HintModeFixtures.selectionContext(of: machine)
         #expect(context.typed.isEmpty)
         #expect(context.visibleHints == all)
-        #expect(effects == [.updateHints(visible: HintModeFixtures.ids(all))])
+        #expect(effects == [.updateHints(visible: HintModeFixtures.ids(all), typed: "")])
+    }
+
+    @Test("3 文字のラベル: 2 文字入力した後の backspace は、残った 1 文字を updateHints に載せる")
+    func backspaceKeepsRemainingTyped() throws {
+        // sadf・要素数 20 では 3 文字のラベルができる
+        var machine = try HintModeFixtures.selecting(elementCount: 20, alphabet: try HintModeFixtures.sadf())
+        let all = try HintModeFixtures.selectionContext(of: machine).hints
+        let label = try #require(all.first { $0.label.count == 3 }?.label)
+        let first = String(label.prefix(1))
+        let firstTwo = String(label.prefix(2))
+        _ = machine.send(.key(.character(Character(first))))
+
+        let narrowed = machine.send(.key(.character(label[label.index(after: label.startIndex)])))
+        let restored = machine.send(.key(.backspace))
+
+        let narrowedHints = all.filter { $0.label.hasPrefix(firstTwo) }
+        let restoredHints = all.filter { $0.label.hasPrefix(first) }
+        #expect(narrowed == [.updateHints(visible: HintModeFixtures.ids(narrowedHints), typed: firstTwo)])
+        #expect(restored == [.updateHints(visible: HintModeFixtures.ids(restoredHints), typed: first)])
     }
 
     @Test("backspace（typed が空）→ selecting のまま、エフェクトなし（Q-7）")
