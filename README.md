@@ -111,7 +111,7 @@ The settings window will let you change the following. It isn't finished yet.
   right ⌘ key does, Tobi receives the changed key instead. Switch the trigger key to right ⌥
   in the settings.
 - **Web content:** Tobi only uses the elements that each app makes available to accessibility
-  tools by default.
+  tools.
   - **Safari** makes its web content available, so links and other elements in pages get labels.
   - **Electron apps (such as VS Code and Orca):** Tobi asks these apps to make their content
     available. They stay in this state until you quit them, which can use more CPU and memory.
