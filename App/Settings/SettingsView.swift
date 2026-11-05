@@ -104,6 +104,8 @@ struct SettingsView: View {
                     supportsOpacity: true
                 )
                 .labelsHidden()
+                // 文字のないコントロールは下端が行揃えの基準になり、ラベルより上にずれる。見た目の中央を文字に合わせる
+                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
                 if let error {
                     ErrorText(SettingsStrings.message(for: error))
                 }
