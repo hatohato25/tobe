@@ -20,9 +20,6 @@ private enum TapLifecycle {
     case idle
     case starting(generation: UInt64)
     case running(generation: UInt64, resources: TapPortBox)
-    /// timeout が続いたので破棄した（`TapTimeoutBreaker`）。終端の状態で、プロセスが終わるまでタップを作らない。
-    /// `stop()` でも `.idle` に戻さない。戻すと、ウォッチドッグが異常なタップを作り直せてしまうため。
-    case abandoned
 
     var isRunning: Bool {
         if case .running = self { true } else { false }
@@ -40,31 +37,6 @@ private struct TapSharedState {
     /// キー破棄（F-7）が ON か。ON はタップのスレッドが単独タップの検出時に立てる（D-8）。
     /// OFF は MainActor（`setSuppressing(false)`）と `stop()`。
     var isSuppressing = false
-    /// timeout の連続の判定。タップを作り直しても捨てない。権限の値が揺れてタップの作り直しが繰り返されたときに、
-    /// 数え直しで安全策が効かなくならないようにするため。誤判定しても再起動を求めるだけで済む。
-    var timeoutBreaker = TapTimeoutBreaker()
-
-    /// タップを破棄し、キー破棄を OFF にする。`lifecycle` が `.running` なら次の状態を `next` にする。
-    /// 破棄した keyDown の記録（`tracker`）は捨てない（対応する keyUp を引き続き破棄するため）。
-    mutating func releaseTap(whenRunningBecoming next: TapLifecycle) {
-        // タップがなくなった後に ON が残ると、次に作ったタップがいきなりキーを破棄するため（N-3.4）
-        isSuppressing = false
-        detector.reset()
-        guard case .running(_, let resources) = lifecycle else { return }
-        // 無効にしたポートの source は run loop から外れる。CFRunLoopStop で CFRunLoopRunInMode から戻す
-        CFMachPortInvalidate(resources.port)
-        CFRunLoopStop(resources.runLoop)
-        lifecycle = next
-    }
-}
-
-/// OS の無効化の通知を受けた結果（ログと通知のため）。
-private enum SystemDisableOutcome {
-    case reenabled
-    /// timeout が続いたので、再有効化せずに破棄した。
-    case abandoned
-    /// `stop()` の後（破棄の途中）か、すでに破棄した後に届いた。
-    case tapNotRunning
 }
 
 /// `TapContext.setSuppressing(_:)` の結果（ログのため）。
@@ -101,19 +73,13 @@ final class TapContext: Sendable {
     // MARK: - 寿命（EventTapController / EventTapThread から呼ぶ）
 
     /// 開始の準備をする。
-    /// - Returns: 新しい世代。既に開始している（開始の途中を含む）か、異常で破棄した後なら失敗。
-    func beginStart() -> Result<UInt64, EventTapError> {
+    /// - Returns: 新しい世代。既に開始している（開始の途中を含む）なら `nil`。
+    func beginStart() -> UInt64? {
         state.withLock { shared in
-            switch shared.lifecycle {
-            case .idle:
-                shared.lastGeneration &+= 1
-                shared.lifecycle = .starting(generation: shared.lastGeneration)
-                return .success(shared.lastGeneration)
-            case .starting, .running:
-                return .failure(.alreadyStarted)
-            case .abandoned:
-                return .failure(.abandoned)
-            }
+            guard case .idle = shared.lifecycle else { return nil }
+            shared.lastGeneration &+= 1
+            shared.lifecycle = .starting(generation: shared.lastGeneration)
+            return shared.lastGeneration
         }
     }
 
@@ -164,9 +130,19 @@ final class TapContext: Sendable {
     /// タップを破棄し、キー破棄を OFF にする（`EventTapController.stop()`）。
     func stop() {
         state.withLock { shared in
-            shared.releaseTap(whenRunningBecoming: .idle)
-            if case .starting = shared.lifecycle {
+            // タップがなくなった後に ON が残ると、次に作ったタップがいきなりキーを破棄するため（N-3.4）
+            shared.isSuppressing = false
+            shared.detector.reset()
+            switch shared.lifecycle {
+            case .idle:
+                break
+            case .starting:
                 // タップのスレッドが finishStart で気付き、作ったタップを破棄する
+                shared.lifecycle = .idle
+            case .running(_, let resources):
+                // 無効にしたポートの source は run loop から外れる。CFRunLoopStop で CFRunLoopRunInMode から戻す
+                CFMachPortInvalidate(resources.port)
+                CFRunLoopStop(resources.runLoop)
                 shared.lifecycle = .idle
             }
         }
@@ -178,7 +154,6 @@ final class TapContext: Sendable {
             case .idle: .notRunning
             case .starting: .starting
             case .running(_, let resources): CGEvent.tapIsEnabled(tap: resources.port) ? .enabled : .disabled
-            case .abandoned: .abandoned
             }
         }
     }
@@ -254,10 +229,10 @@ final class TapContext: Sendable {
         let now = Timestamp(nanoseconds: clock_gettime_nsec_np(CLOCK_UPTIME_RAW))
         switch type {
         case .tapDisabledByTimeout:
-            handleSystemDisable(reason: .timeout, at: now)
+            reenableAfterSystemDisable(reason: .timeout)
             return .pass
         case .tapDisabledByUserInput:
-            handleSystemDisable(reason: .userInput, at: now)
+            reenableAfterSystemDisable(reason: .userInput)
             return .pass
         case .flagsChanged:
             handleFlagsChanged(event: event, at: now)
@@ -336,37 +311,20 @@ final class TapContext: Sendable {
 
     /// OS がタップを無効化した。すぐに再有効化し、判定の途中状態を捨てる（design.md 7.4、F-1.10）。
     /// 破棄した keyDown の記録（KeySuppressionTracker）は捨てない（対応する keyUp を引き続き破棄するため）。
-    ///
-    /// timeout が続いたら再有効化せず、この場でタップを破棄する（`TapTimeoutBreaker`）。入力を解放する安全策なので、
-    /// MainActor を待たない。MainActor が詰まっていても入力が届くようにするため。
-    private func handleSystemDisable(reason: TapDisableReason, at now: Timestamp) {
-        let outcome: SystemDisableOutcome = state.withLock { shared in
+    private func reenableAfterSystemDisable(reason: TapDisableReason) {
+        let reenabled = state.withLock { shared in
             shared.detector.reset()
-            // stop() の後（破棄の途中）なら再有効化しない。停止済みのタップの通知は数えない
-            guard case .running(_, let resources) = shared.lifecycle else { return .tapNotRunning }
-            if reason == .timeout, shared.timeoutBreaker.recordTimeout(at: now) == .abandon {
-                shared.releaseTap(whenRunningBecoming: .abandoned)
-                return .abandoned
-            }
+            // stop() の後（破棄の途中）なら作り直さない
+            guard case .running(_, let resources) = shared.lifecycle else { return false }
             CGEvent.tapEnable(tap: resources.port, enable: true)
-            return .reenabled
+            return true
         }
-        switch outcome {
-        case .reenabled:
-            continuation.yield(.tapReenabled(reason: reason))
-            Log.hotkey.warning("イベントタップが OS に無効化された（\(reason.rawValue, privacy: .public)）。再有効化した")
-        case .abandoned:
-            continuation.yield(.abandoned)
-            Log.hotkey.fault(
-                """
-                イベントタップが \(TapTimeoutBreaker.windowSeconds, privacy: .public) 秒以内に \
-                \(TapTimeoutBreaker.abandonThreshold, privacy: .public) 回 timeout で無効化された。\
-                入力を解放するため、再有効化せずに破棄し、キー破棄を OFF にした。Tobi を再起動するまで作らない
-                """
-            )
-        case .tapNotRunning:
+        guard reenabled else {
             Log.hotkey.info("停止済みのイベントタップに無効化の通知が届いた（\(reason.rawValue, privacy: .public)）。再有効化しない")
+            return
         }
+        continuation.yield(.tapReenabled(reason: reason))
+        Log.hotkey.warning("イベントタップが OS に無効化された（\(reason.rawValue, privacy: .public)）。再有効化した")
     }
 
     #if DEBUG

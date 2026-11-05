@@ -12,7 +12,7 @@ import TobiCore
 /// 通知の結び方:
 /// - `hotkey.tapEvents`（購読者は 1 つだけ。ここで購読する）:
 ///   `.triggered` → signpost の区間を始めて `triggerTapped()`、`.hintKey` → `KeyTranslator` で変換して `keyPressed(_:)`、
-///   `.pointerDown` → `pointerDown()`、`.tapReenabled` → ログだけ、`.abandoned` → `pointerDown()` でヒントモードを終える
+///   `.pointerDown` → `pointerDown()`、`.tapReenabled` → ログだけ
 /// - `ScreenGeometryProvider.screenChanges()`: `screensChanged()` → `overlay.rebuildPanels(for:)` の順
 ///   （OverlayController は自分では購読しない。T45）
 ///
@@ -136,12 +136,6 @@ final class HintModeModule: AppModule {
         case .tapReenabled(let reason):
             // 再有効化そのもののログはタップ側（TapContext）が出している。ヒントモードの状態は変えない
             Log.hotkey.info("ヒントモード: タップの再有効化の通知を受けた（\(reason.rawValue, privacy: .public)）")
-        case .abandoned:
-            // タップがなくなり、キーもクリックも届かないので、ヒントモードを終えてラベルを消す。
-            // 専用の入力は足さず pointerDown() を使う。収集中なら取り消し、ラベル入力中なら消し、待機中なら何もしない、という
-            // 必要な動きがクリックの扱い（暫定 Q-10）と同じで、音も鳴らないため。キー破棄はタップのスレッドが OFF にしてある
-            coordinator.pointerDown()
-            finishSessionIfIdle()
         }
     }
 

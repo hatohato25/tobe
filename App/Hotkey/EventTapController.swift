@@ -18,9 +18,6 @@ enum TapEvent: Equatable, Sendable {
     case pointerDown
     /// OS に無効化されたタップを再有効化した（F-1.10）。ログ用。
     case tapReenabled(reason: TapDisableReason)
-    /// timeout が続いたので、タップを破棄した（`TapTimeoutBreaker`）。キー破棄は OFF にしてある。
-    /// この後、このストリームに新しい通知は届かない（Tobi を再起動するまでタップを作らないため）。
-    case abandoned
 }
 // swiftlint:enable identifier_name
 
@@ -42,8 +39,6 @@ enum EventTapStatus: Equatable, Sendable {
     case enabled
     /// タップはあるが無効になっている（OS の無効化の通知を取りこぼした場合など）。
     case disabled
-    /// timeout が続いたので破棄した（`TapTimeoutBreaker`）。`.notRunning` と違い、Tobi を再起動するまで作らない。
-    case abandoned
 }
 
 /// `EventTapController.start()` の失敗。
@@ -59,8 +54,6 @@ enum EventTapError: Error, Equatable {
     case runLoopUnavailable
     /// 作成の途中で `stop()` が呼ばれた。作ったタップは破棄済み。
     case stoppedDuringStart
-    /// timeout が続いて破棄した後なので作らない（`EventTapStatus.abandoned`）。作るには Tobi の再起動が要る。
-    case abandoned
 }
 
 /// イベントタップの作成・破棄・再有効化と、起動キーの単独タップの検出（design.md 7.1〜7.4、F-1）。
@@ -70,8 +63,6 @@ enum EventTapError: Error, Equatable {
 /// - タップのスレッドと MainActor で共有する状態は `TapContext` が `Synchronization.Mutex` で守る（design.md 13 章）。
 /// - 起動キーの単独タップを検出すると、タップのスレッドが自分でキー破棄を ON にしてから `.triggered` を送る（D-8）。
 /// - OS がタップを無効化したら、コールバックの中で再有効化して判定の途中状態を捨て、`.tapReenabled` を送る（F-1.10）。
-///   ただし timeout が続いたら（`TapTimeoutBreaker`）再有効化せず、コールバックの中でタップを破棄してキー破棄を OFF にし、
-///   `.abandoned` を送る。この後は `start()` が `.abandoned` で失敗し、Tobi を再起動するまでタップを作らない。
 /// - キー破棄が ON の間、keyDown / keyUp は design.md 7.3 の規則（`KeySuppressionTracker`）で破棄し、破棄した keyDown を
 ///   `.hintKey` で送る（F-7）。flagsChanged とクリックは破棄しない。クリックは `.pointerDown` で送る（暫定 Q-10）。
 ///   キー破棄の OFF は `setSuppressing(false)`（`KeySuppressionGate`）で行う。
@@ -111,7 +102,9 @@ final class EventTapController: Sendable {
     /// 権限の確認はしない。呼び出し側（T37）が `PermissionMonitor` で許可を確かめてから呼び、
     /// 失敗したら案内画面（`.tapCreationFailed`）を出す（N-3.5）。
     func start() async throws(EventTapError) {
-        let generation = try context.beginStart().get()
+        guard let generation = context.beginStart() else {
+            throw .alreadyStarted
+        }
         let result: Result<Void, EventTapError> = await withCheckedContinuation { continuation in
             EventTapThread.start(context: context, generation: generation) { result in
                 continuation.resume(returning: result)
@@ -125,7 +118,7 @@ final class EventTapController: Sendable {
     /// 権限が取り消されたとき（ウォッチドッグ、T34）や終了時に呼ぶ。キー破棄が ON のままタップがなくなると
     /// 次に作ったタップがいきなりキーを破棄するので、ここで必ず OFF にする（N-3.4）。
     /// 作り直すときは `stop()` の後に `start()` を呼ぶ（古いスレッドの終了を待たなくてよい）。
-    /// タップがなければ何もしない。`.abandoned` は `stop()` しても `.abandoned` のまま。
+    /// タップがなければ何もしない。
     func stop() {
         context.stop()
     }
@@ -170,9 +163,6 @@ enum EventTapWatchdogEvent: Equatable, Sendable {
     case tapStarted
     /// タップを作れなかった（N-3.5）。権限が変わるまで（取り消し → 許可）作り直さない。
     case tapStartFailed(EventTapError)
-    /// timeout が続いてタップを破棄した（`EventTapStatus.abandoned`）。Tobi を再起動するまで作らないので、再起動を求める。
-    /// 権限がないときは送らず、許可されたときに `.permissionGranted` の代わりに送る。
-    case tapAbandoned
 }
 
 /// 権限とタップの状態を見張り、権限がある間はタップが動いているようにする（design.md 7.4、N-3.4、F-1.10）。
@@ -183,7 +173,6 @@ enum EventTapWatchdogEvent: Equatable, Sendable {
 /// - 許可されたらタップを作る。
 /// - 1 秒ごとに `EventTapController.status` を見る。権限があるのに `.disabled` なら再有効化し（無効化の通知の
 ///   取りこぼし）、`.notRunning` なら `stop()` → `start()` で作り直す（run loop の予期しない終了）。
-/// - `.abandoned`（timeout が続いて破棄した）なら作り直さず、権限が変わっても作らない。`.tapAbandoned` で再起動を求める。
 ///
 /// `EventTapController` とは別の型にした。コントローラはタップのスレッドからも触る `Sendable` の型で、
 /// こちらは MainActor の `PermissionMonitor` と Timer に依存するため（design.md 13 章）。
@@ -211,17 +200,8 @@ final class EventTapWatchdog {
     private var permissionTask: Task<Void, Never>?
     /// 作成中の `controller.start()`。作成中に重ねて作らないために持つ。
     private var startTask: Task<Void, Never>?
-    private var repeatGuard: RepeatGuard = .none
-
-    /// 権限が変わるまで繰り返さない出来事。毎秒作り直して失敗の案内を出し続けたり、再起動の案内を出し続けたりしないため。
-    /// 権限が変わると `.none` に戻る。
-    private enum RepeatGuard {
-        case none
-        /// 作成に失敗した。作り直さない。
-        case startFailed
-        /// `.tapAbandoned` を送った。作り直さないのは `EventTapStatus.abandoned` が決めるので、ここでは送ったことだけを持つ。
-        case abandonmentReported
-    }
+    /// 作成に失敗した後は、権限が変わるまで作り直さない。毎秒作り直して失敗の案内を出し続けないため。
+    private var isRetryBlockedByFailure = false
 
     init(controller: EventTapController, permissionMonitor: PermissionMonitor) {
         self.controller = controller
@@ -268,7 +248,7 @@ final class EventTapWatchdog {
     }
 
     private func handlePermissionChange(_ status: PermissionStatus) {
-        repeatGuard = .none
+        isRetryBlockedByFailure = false
         switch status {
         case .notGranted:
             // 作成の途中でも止める（作成中のタップは finishStart で破棄され、start() は stoppedDuringStart で終わる）
@@ -276,12 +256,6 @@ final class EventTapWatchdog {
             Log.hotkey.warning("アクセシビリティ権限が取り消されたため、イベントタップを止め、キー破棄を OFF にした")
             continuation.yield(.permissionRevoked)
         case .granted:
-            // 破棄の後は、許可されてもタップを作らない。.permissionGranted を送ると案内画面が閉じ、
-            // 動いていないのに動いているように見えるので、再起動の案内を送る
-            guard controller.status != .abandoned else {
-                reportAbandonmentIfNeeded()
-                return
-            }
             continuation.yield(.permissionGranted)
             startTap(reason: "権限が許可された")
         }
@@ -295,13 +269,9 @@ final class EventTapWatchdog {
         switch permissionMonitor.status {
         case .notGranted:
             // 取り消しは handlePermissionChange で止めている。それでもタップが残っていれば止める（N-3.4）
-            switch tapStatus {
-            case .notRunning, .abandoned:
-                return
-            case .starting, .enabled, .disabled:
-                controller.stop()
-                Log.hotkey.error("権限がないのにイベントタップが残っていたので止めた")
-            }
+            guard tapStatus != .notRunning else { return }
+            controller.stop()
+            Log.hotkey.error("権限がないのにイベントタップが残っていたので止めた")
         case .granted:
             switch tapStatus {
             case .enabled, .starting:
@@ -310,22 +280,12 @@ final class EventTapWatchdog {
                 // 無効化の通知を取りこぼした。ログは reenableIfDisabled が残す
                 controller.reenableIfDisabled()
             case .notRunning:
-                guard repeatGuard != .startFailed else { return }
+                guard !isRetryBlockedByFailure else { return }
                 Log.hotkey.error("イベントタップが予期せず止まっていたので作り直す")
                 controller.stop()
                 startTap(reason: "予期しない停止からの作り直し")
-            case .abandoned:
-                reportAbandonmentIfNeeded()
             }
         }
-    }
-
-    /// `.tapAbandoned` を送る。権限が変わるまでは 1 回だけにする（閉じた案内画面を毎秒出し直さないため）。
-    private func reportAbandonmentIfNeeded() {
-        guard repeatGuard != .abandonmentReported else { return }
-        repeatGuard = .abandonmentReported
-        Log.hotkey.notice("イベントタップは破棄済み。作り直さず、再起動を求める")
-        continuation.yield(.tapAbandoned)
     }
 
     private func startTap(reason: String) {
@@ -356,7 +316,7 @@ final class EventTapWatchdog {
             // startTap で .notRunning を確かめているので、ウォッチドッグの外で start() が呼ばれた場合だけ起きる
             Log.hotkey.fault("ウォッチドッグの外でイベントタップが開始された。ウォッチドッグからは作らない")
         case .failure(let error):
-            repeatGuard = .startFailed
+            isRetryBlockedByFailure = true
             continuation.yield(.tapStartFailed(error))
         }
     }

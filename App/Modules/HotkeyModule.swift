@@ -113,10 +113,6 @@ final class HotkeyModule: AppModule {
         case .tapStartFailed(let error):
             Log.app.error("イベントタップを作れなかった: \(String(describing: error), privacy: .public)")
             permissionGuide.show(state: .tapCreationFailed)
-        case .tapAbandoned:
-            // タップの破棄とキー破棄の OFF はタップのスレッドが済ませてある。再起動を求める（"Please restart Tobi."）
-            Log.app.error("イベントタップを異常で破棄した。再起動を案内する")
-            permissionGuide.show(state: .tapCreationFailed)
         }
     }
 }
