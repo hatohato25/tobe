@@ -1,0 +1,446 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "Access is allowed, but Tobi couldn't start listening for the trigger key. Please restart Tobi.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アクセスは許可されていますが、起動キーの検出を開始できませんでした。Tobi を再起動してください。"
+          }
+        }
+      }
+    },
+    "Accessibility Access for Tobi": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tobi のアクセシビリティの許可"
+          }
+        }
+      }
+    },
+    "Accessibility access is allowed. Tobi is ready.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アクセシビリティが許可されました。Tobi を使えます。"
+          }
+        }
+      }
+    },
+    "Accessibility access is not allowed yet.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アクセシビリティはまだ許可されていません。"
+          }
+        }
+      }
+    },
+    "Allow Tobi in System Settings > General > Login Items to open it at login.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ログイン時に開くには、システム設定のログイン項目で Tobi を許可してください。"
+          }
+        }
+      }
+    },
+    "Background Color": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "背景の色"
+          }
+        }
+      }
+    },
+    "Background Color:": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "背景の色："
+          }
+        }
+      }
+    },
+    "Close": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "閉じる"
+          }
+        }
+      }
+    },
+    "Couldn't read the Open at Login status.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「ログイン時に開く」の状態を読み取れませんでした。"
+          }
+        }
+      }
+    },
+    "Couldn't turn off Open at Login: %@": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「ログイン時に開く」をオフにできませんでした：%@"
+          }
+        }
+      }
+    },
+    "Couldn't turn on Open at Login: %@": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「ログイン時に開く」をオンにできませんでした：%@"
+          }
+        }
+      }
+    },
+    "Enter a size from %lld to %lld pt. This value was not saved.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld〜%2$lld pt で入力してください。この値は保存されていません。"
+          }
+        }
+      }
+    },
+    "Font Size": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "フォントサイズ"
+          }
+        }
+      }
+    },
+    "Font Size:": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "フォントサイズ："
+          }
+        }
+      }
+    },
+    "Grant Accessibility Permission…": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アクセシビリティを許可…"
+          }
+        }
+      }
+    },
+    "Hint Characters": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ラベルの文字"
+          }
+        }
+      }
+    },
+    "Hint Characters:": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ラベルの文字："
+          }
+        }
+      }
+    },
+    "Letters a–z, at least 2, no duplicates. Default: sadfjklewcmpgh": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "a〜z の文字を、重複なしで 2 文字以上。デフォルト：sadfjklewcmpgh"
+          }
+        }
+      }
+    },
+    "Once you allow access, Tobi turns on automatically. No restart is needed.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "許可すると、Tobi は自動で使えるようになります。再起動は不要です。"
+          }
+        }
+      }
+    },
+    "Open Login Items Settings…": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ログイン項目の設定を開く…"
+          }
+        }
+      }
+    },
+    "Open System Settings": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "システム設定を開く"
+          }
+        }
+      }
+    },
+    "Open at Login": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ログイン時に開く"
+          }
+        }
+      }
+    },
+    "Quit Tobi": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tobi を終了"
+          }
+        }
+      }
+    },
+    "Right Command (⌘)": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "右コマンド（⌘）"
+          }
+        }
+      }
+    },
+    "Right Option (⌥)": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "右オプション（⌥）"
+          }
+        }
+      }
+    },
+    "Settings…": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定…"
+          }
+        }
+      }
+    },
+    "Startup:": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "起動："
+          }
+        }
+      }
+    },
+    "Text Color": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文字の色"
+          }
+        }
+      }
+    },
+    "Text Color:": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文字の色："
+          }
+        }
+      }
+    },
+    "The saved value for %@ was invalid, so the default value is used.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存されていた「%@」の値が正しくないため、デフォルトの値を使っています。"
+          }
+        }
+      }
+    },
+    "This color can't be used.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この色は使えません。"
+          }
+        }
+      }
+    },
+    "This color is outside the sRGB range. Choose another color.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この色は sRGB の範囲外です。別の色を選んでください。"
+          }
+        }
+      }
+    },
+    "Tobi": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tobi"
+          }
+        }
+      }
+    },
+    "Tobi (Accessibility permission required)": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tobi（アクセシビリティの許可が必要）"
+          }
+        }
+      }
+    },
+    "Tobi Settings": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tobi の設定"
+          }
+        }
+      }
+    },
+    "Tobi couldn't find its login item. Move Tobi to the Applications folder and try again.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ログイン項目が見つかりませんでした。Tobi をアプリケーションフォルダに移動して、もう一度試してください。"
+          }
+        }
+      }
+    },
+    "Tobi never records or sends your keystrokes.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tobi がキー入力を記録したり送信したりすることはありません。"
+          }
+        }
+      }
+    },
+    "Tobi uses Accessibility to find and press buttons in other apps, and to receive the keys you type while hints are shown.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tobi はアクセシビリティを使って、他のアプリのボタンを見つけて押したり、ラベルの表示中に打ったキーを受け取ったりします。"
+          }
+        }
+      }
+    },
+    "Trigger Key": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "起動キー"
+          }
+        }
+      }
+    },
+    "Trigger Key:": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "起動キー："
+          }
+        }
+      }
+    },
+    "Use at least 2 characters. This value was not saved.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2 文字以上にしてください。この値は保存されていません。"
+          }
+        }
+      }
+    },
+    "pt": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pt"
+          }
+        }
+      }
+    },
+    "“%@” can't be used. Use letters a–z only. This value was not saved.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」は使えません。a〜z だけを使ってください。この値は保存されていません。"
+          }
+        }
+      }
+    },
+    "“%@” is used more than once. This value was not saved.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」が重複しています。この値は保存されていません。"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

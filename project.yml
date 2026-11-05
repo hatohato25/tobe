@@ -6,6 +6,7 @@ options:
   deploymentTarget:
     macOS: "27.0"
   createIntermediateGroups: true
+  developmentLanguage: en
 configFiles:
   # 署名 ID（CODE_SIGN_IDENTITY）と Local.xcconfig の取り込みはここ（D-26）
   Debug: Config/Base.xcconfig
@@ -32,6 +33,7 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: $(TOBI_DISPLAY_NAME)
+        CFBundleLocalizations: [en, ja] # 日本語以外は英語にする（Q-24）
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
@@ -54,6 +56,7 @@ targets:
         PROVISIONING_PROFILE_SPECIFIER: ""
         SWIFT_STRICT_CONCURRENCY: complete
         DEAD_CODE_STRIPPING: YES
+        SWIFT_EMIT_LOC_STRINGS: YES # String Catalog の訳の抜けを .stringsdata で確かめるため
       configs:
         Debug:
           # インストール済みのリリース版と、アクセシビリティの許可・UserDefaults を分ける（D-27）
