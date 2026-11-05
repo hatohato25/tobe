@@ -1,3 +1,4 @@
+import AppKit
 import TobiCore
 
 /// ヒントモード（要素の収集、ラベル表示、入力の絞り込み、操作の実行）を担当するモジュール（design.md 1.1、3.6、T48）。
@@ -52,6 +53,8 @@ final class HintModeModule: AppModule {
 
     private var tapEventsTask: Task<Void, Never>?
     private var screenChangesTask: Task<Void, Never>?
+    private let electronEnabler = ElectronAccessibilityEnabler()
+    private var activationObserver: NSObjectProtocol?
 
     init(hotkey: HotkeyModule) {
         self.hotkey = hotkey
@@ -60,7 +63,7 @@ final class HintModeModule: AppModule {
         self.screens = screens
         self.registry = registry
         overlay = OverlayController(screens: screens.currentSnapshots())
-        collector = AXElementCollector(registry: registry)
+        collector = AXElementCollector(registry: registry, electronEnabler: electronEnabler)
         let poster = MouseClickPoster()
         performer = AXActionPerformer(
             client: AXClient(),
@@ -88,7 +91,27 @@ final class HintModeModule: AppModule {
                 self?.screensDidChange()
             }
         }
+        startEnablingElectronApps()
         Log.app.notice("HintModeModule を開始した")
+    }
+
+    /// 前面のアプリが Electron なら、ラベルを出す前に中身の公開を頼んでおく。公開に数秒かかるので、最初のタップに間に合わせるため。
+    private func startEnablingElectronApps() {
+        let enabler = electronEnabler
+        let enable: @Sendable (NSRunningApplication?) -> Void = { app in
+            guard let pid = app?.processIdentifier else { return }
+            let processID = ProcessID(rawValue: pid)
+            // AX の IPC は MainActor で待たない
+            DispatchQueue.global(qos: .userInitiated).async { enabler.enableIfNeeded(for: processID) }
+        }
+        enable(NSWorkspace.shared.frontmostApplication)
+        activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { notification in
+            enable(notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)
+        }
     }
 
     func stop() {
@@ -96,6 +119,10 @@ final class HintModeModule: AppModule {
         tapEventsTask = nil
         screenChangesTask?.cancel()
         screenChangesTask = nil
+        if let activationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(activationObserver)
+            self.activationObserver = nil
+        }
         overlay.hide()
         // セッションの途中で止めた場合に、キーが破棄されたまま残らないようにする（変化がなければ何もしない）
         hotkey.eventTap.setSuppressing(false)

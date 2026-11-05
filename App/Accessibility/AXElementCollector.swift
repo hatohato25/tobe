@@ -53,10 +53,14 @@ struct AXElementCollector: ElementCollecting {
     private let client = AXClient()
     private let windowEnumerator = WindowEnumerator()
     private let policy = TraversalPolicy()
+    private let electronEnabler: ElectronAccessibilityEnabler
     private let registry: ElementHandleRegistry
 
-    /// - Parameter registry: 収集した要素の対応表。同じものを `AXActionPerformer` に `registry.lookup` で渡す（T48）。
-    init(registry: ElementHandleRegistry) {
+    /// - Parameters:
+    ///   - registry: 収集した要素の対応表。同じものを `AXActionPerformer` に `registry.lookup` で渡す（T48）。
+    ///   - electronEnabler: 見えているウィンドウの Electron アプリに、収集のときに中身の公開を頼む。
+    init(registry: ElementHandleRegistry, electronEnabler: ElectronAccessibilityEnabler) {
+        self.electronEnabler = electronEnabler
         self.registry = registry
     }
 
@@ -130,7 +134,10 @@ struct AXElementCollector: ElementCollecting {
     ) async -> [AppCollection] {
         await withTaskGroup(of: (Int, AppCollection).self) { group in
             for (index, app) in apps.enumerated() {
-                let job = AppCollectionJob(client: client, policy: policy, plan: app, deadline: deadline, flag: flag)
+                let job = AppCollectionJob(
+                    client: client, policy: policy, electronEnabler: electronEnabler, plan: app, deadline: deadline,
+                    flag: flag
+                )
                 group.addTask {
                     (index, await Self.runOnQueue { job.run() })
                 }
@@ -332,6 +339,7 @@ private struct AppCollectionJob: Sendable {
 
     let client: AXClient
     let policy: TraversalPolicy
+    let electronEnabler: ElectronAccessibilityEnabler
     let plan: AppPlan
     let deadline: ContinuousClock.Instant
     let flag: CancellationFlag
@@ -342,6 +350,7 @@ private struct AppCollectionJob: Sendable {
         let issues = AXAttributeIssueCounter()
         var state = JobState()
         var stopReason = WalkStopReason.completed
+        electronEnabler.enableIfNeeded(for: plan.pid)
         var roots: [WalkRoot] = []
         do throws(JobInterruption) {
             roots = try resolveMenuRoots(state: &state, issues: issues)

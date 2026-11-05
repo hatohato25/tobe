@@ -80,6 +80,11 @@ struct AXClient: Sendable {
         try Self.check(AXUIElementPerformAction(element.raw, kAXPressAction as CFString))
     }
 
+    /// `AXUIElementSetAttributeValue` で、真偽値の属性を設定する（`ElectronAccessibilityEnabler`）。
+    func setAttribute(_ attribute: String, to value: Bool, of element: AXElementRef) throws(AccessibilityReadError) {
+        try Self.check(AXUIElementSetAttributeValue(element.raw, attribute as CFString, value as CFBoolean))
+    }
+
     // MARK: - タイムアウト
 
     /// その参照のメッセージングのタイムアウトを設定する（V-3: この参照にだけ効く）。プロセス内の設定で IPC は発生しない。
