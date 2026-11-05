@@ -20,6 +20,8 @@ struct SettingsView: View {
     let launchAtLogin: LaunchAtLoginModel
     /// 画面を開くたびに変わる値。変わると入力欄の下書きを作り直す。
     let sessionID: UUID
+    /// 既定値に戻すたびに変わる値。変わると入力欄の下書きを作り直す。
+    @State private var resetID = UUID()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -52,6 +54,14 @@ struct SettingsView: View {
             }
             .formStyle(.columns)
             .id(sessionID)
+            .id(resetID)
+            HStack {
+                Spacer()
+                Button(SettingsStrings.restoreDefaults) {
+                    model.resetToDefaults()
+                    resetID = UUID()
+                }
+            }
         }
         .padding(24)
         .frame(width: 480)
@@ -302,6 +312,9 @@ private enum SettingsStrings {
     static let textColor = String(localized: "Text Color:", comment: "Settings: label of the text color picker")
     static let backgroundColor = String(
         localized: "Background Color:", comment: "Settings: label of the background color picker"
+    )
+    static let restoreDefaults = String(
+        localized: "Restore Defaults", comment: "Settings: button that sets the settings back to their default values"
     )
     static let launchAtLoginSection = String(
         localized: "Startup:", comment: "Settings: label of the row that contains the Open at Login toggle"

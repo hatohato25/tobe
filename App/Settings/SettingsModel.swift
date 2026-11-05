@@ -140,6 +140,22 @@ final class SettingsModel {
         )
     }
 
+    /// 全項目を既定値（`TobiSettings.defaults`）に戻して保存する（S-0.5）。起動キーはすぐに反映する。
+    /// ログイン時の起動は戻さない。設定の値ではなく、ユーザーが OS に登録した状態のため（D-22）。
+    func resetToDefaults() {
+        alphabetError = nil
+        fontSizeError = nil
+        textColorError = nil
+        backgroundColorError = nil
+        let previousTriggerKey = settings.triggerKey
+        settings = .defaults
+        store.save(settings)
+        if previousTriggerKey != settings.triggerKey {
+            applyTriggerKey(settings.triggerKey)
+        }
+        Log.settings.notice("設定を既定値に戻した")
+    }
+
     // MARK: - 内部
 
     /// 見た目を保存する。同じ値なら書き込まない（`ColorPicker` は同じ色を何度も送ることがあるため）。

@@ -231,6 +231,16 @@
         }
       }
     },
+    "Restore Defaults": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デフォルトに戻す"
+          }
+        }
+      }
+    },
     "Right Command (⌘)": {
       "localizations": {
         "ja": {
