@@ -271,7 +271,9 @@ private struct LaunchAtLoginRow: View {
                 .fixedSize(horizontal: false, vertical: true)
             Button(SettingsStrings.openLoginItems) { model.openSystemSettingsLoginItems() }
         case .notFound:
-            ErrorText(SettingsStrings.launchAtLoginNotFound)
+            if model.turnOnFoundNoService {
+                ErrorText(SettingsStrings.launchAtLoginNotFound)
+            }
         case .enabled, .notRegistered, nil:
             EmptyView()
         }

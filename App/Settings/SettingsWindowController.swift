@@ -151,6 +151,8 @@ final class LaunchAtLoginModel {
     private(set) var status: LaunchAtLoginStatus?
     /// 直近の操作または読み取りが失敗したときの、画面に出す文。成功すると `nil` に戻る。
     private(set) var failureMessage: String?
+    /// オンにしようとしてサービスが見つからなかったか。未登録のアプリでも `.notFound` が返るので、状態だけではエラーと判断しない。
+    private(set) var turnOnFoundNoService = false
 
     @ObservationIgnored private let service: any LaunchAtLoginControlling
 
@@ -174,11 +176,13 @@ final class LaunchAtLoginModel {
     /// ログイン時に起動するように登録する（S-4.1）。
     func turnOn() {
         apply { () throws(LaunchAtLoginError) in try service.enable() }
+        turnOnFoundNoService = status == .notFound
     }
 
     /// ログイン時の起動の登録を解除する（S-4.1）。
     func turnOff() {
         apply { () throws(LaunchAtLoginError) in try service.disable() }
+        turnOnFoundNoService = false
     }
 
     /// システム設定の「ログイン項目」を開く（S-4.3）。

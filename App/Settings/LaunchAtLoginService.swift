@@ -9,7 +9,7 @@ enum LaunchAtLoginStatus: Sendable, Equatable {
     case notRegistered
     /// 登録済みだが、システム設定の「ログイン項目」でユーザーの承認が要る（S-4.3）。
     case requiresApproval
-    /// サービスが見つからない。アプリのバンドルや署名に問題がある可能性があるので、エラーとして表示する。
+    /// サービスが見つからない。一度も登録していないアプリでも返るので、オンにしようとしたときだけエラーとして表示する。
     case notFound
 }
 

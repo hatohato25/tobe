@@ -13,7 +13,6 @@ included:
 excluded:
   - .build
   - "**/.build"
-  - Spikes
   - "*.xcodeproj"
   - build
   - DerivedData

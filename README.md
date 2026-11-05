@@ -5,9 +5,8 @@ Tap the right Command key on its own and Tobi puts short labels on the clickable
 screen: buttons, links, text fields, menu items, tabs and so on. Type a label and Tobi
 clicks that element. You don't need the mouse or trackpad.
 
-> **Status: in development (pre-MVP).** Tobi doesn't work end to end yet, and there are
-> no releases. The installation steps below describe the planned distribution. Expect them
-> to change.
+> **Status: early release (0.1.0).** Tobi has been tested on one Mac with one display. If you
+> run into a problem, please [open an issue](https://github.com/hatohato25/tobi/issues).
 
 ## Requirements
 
@@ -16,13 +15,10 @@ clicks that element. You don't need the mouse or trackpad.
 
 ## Installation
 
-> Not available yet. These are the planned steps for the first release.
-
-Tobi will be distributed through a Homebrew tap:
+Install Tobi from its Homebrew tap:
 
 ```sh
-brew tap hatohato25/tobi
-brew install --cask tobi
+brew install --cask hatohato25/tobi/tobi
 ```
 
 ### First launch (Tobi is not notarized)
@@ -37,9 +33,6 @@ Gatekeeper blocks it the first time you open it. Use one of these options to ope
   ```sh
   xattr -dr com.apple.quarantine /Applications/Tobi.app
   ```
-
-These steps aren't final. Homebrew's handling of non-notarized casks has changed between
-versions, so the exact instructions will be confirmed when the first release is published.
 
 ### Verifying the download
 
@@ -76,8 +69,6 @@ screen in System Settings.
 
 ## Usage
 
-This is how Tobi is designed to work. Parts of it aren't implemented yet.
-
 1. **Enter hint mode:** Tap the **right Command (⌘)** key on its own. Press it and release it
    within 300 ms, without pressing any other key. Shortcuts such as ⌘C still work as usual.
 2. **Type a label:** Labels that don't match what you've typed so far are hidden. When only
@@ -92,12 +83,16 @@ receive them, so typing a label never inserts text into a text field.
 
 ### Settings
 
-The settings window will let you change the following. It isn't finished yet.
+Open the settings window from the Tobi icon in the menu bar. You can change the following:
 
 - The trigger key: **right ⌘** (default) or **right Option (⌥)**.
 - The characters used for labels. The default is `sadfjklewcmpgh`, the same as Vimium.
 - How labels look (font size and colors).
 - Whether Tobi opens at login.
+
+**Restore Defaults** resets everything except the open-at-login setting. The settings window,
+menu and permission guide appear in Japanese if your Mac's language is Japanese, and in
+English otherwise.
 
 ## Known limitations
 
