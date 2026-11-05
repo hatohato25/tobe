@@ -48,7 +48,7 @@ targets:
         # 表示名は独自の設定値を経由して Info.plist に渡す。
         TOBI_DISPLAY_NAME: Tobi
         MARKETING_VERSION: 0.1.0
-        CURRENT_PROJECT_VERSION: 1
+        CURRENT_PROJECT_VERSION: 2
         ENABLE_HARDENED_RUNTIME: YES # 公証はしないが有効にしておく（D-26）
         ENABLE_APP_SANDBOX: NO # AX API とイベントタップのため（C-1）。entitlements ファイルは作らない（D-25）
         CODE_SIGN_STYLE: Manual # 署名 ID は Config/Base.xcconfig（D-26）
