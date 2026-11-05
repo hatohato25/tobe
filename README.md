@@ -68,10 +68,11 @@ screen, click them, and catch the keys you type in hint mode.
 - **Input Monitoring is not needed.**
 - **You don't need to restart Tobi** after you grant the permission. Tobi notices the change
   and starts working.
-- If you revoke the permission while Tobi is running, Tobi stops catching keys within about a
-  second.
+- Quit Tobi before you revoke the permission. See [Known limitations](#known-limitations).
 
-Grant the permission in **System Settings > Privacy & Security > Accessibility**.
+To grant the permission, select **Open System Settings** in Tobi's permission guide. On macOS 27
+with the system language set to Japanese, this opens the 「デバイスの制御とデータへのアクセス」
+screen in System Settings.
 
 ## Usage
 
@@ -100,6 +101,9 @@ The settings window will let you change the following. It isn't finished yet.
 
 ## Known limitations
 
+- **Removing the Accessibility permission while Tobi is running:** Don't do this during hint
+  mode. In one test, clicks stopped reaching every app until the Mac was force-restarted. To
+  remove the permission, quit Tobi first.
 - **Secure Input:** While Secure Input is on, macOS doesn't send keystrokes to Tobi. Secure
   Input is on in password fields and when a terminal's "Secure Keyboard Entry" is enabled.
   Hint mode might not start during this time.
@@ -108,10 +112,13 @@ The settings window will let you change the following. It isn't finished yet.
   in the settings.
 - **Web content:** Tobi only uses the elements that each app makes available to accessibility
   tools by default.
-  - **Safari** and **some Electron apps (such as VS Code)** make their web content available,
-    so links and other elements in pages and app screens get labels.
-  - **Chrome and many other Electron apps** don't. Only the window frame, tabs and toolbar
-    get labels, not the content inside. Support for these apps may come after the MVP.
+  - **Safari** makes its web content available, so links and other elements in pages get labels.
+  - **Electron apps (such as VS Code and Orca):** Tobi asks these apps to make their content
+    available. They stay in this state until you quit them, which can use more CPU and memory.
+    Right after an app starts, labels might not appear on its content yet. Terminals in these
+    apps get labels for the whole terminal area and its tabs, not for each piece of text.
+  - **Chrome** doesn't. Only the window frame, tabs and toolbar get labels, not the content
+    inside. Support may come after the MVP.
 - **Apps that draw their own UI:** Some apps, such as WezTerm and many games, draw their
   whole window themselves (for example with Metal) instead of using standard macOS controls.
   They don't make their contents available to accessibility tools, so only the window frame
@@ -178,7 +185,7 @@ swiftlint lint --strict
 swift format lint --recursive --strict App Packages
 ```
 
-To reset the Accessibility permission of the Debug build:
+To reset the Accessibility permission of the Debug build, quit Tobi and then run:
 
 ```sh
 tccutil reset Accessibility io.github.hatohato25.tobi.debug
