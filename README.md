@@ -7,7 +7,7 @@ Tap the right Command key on its own and Tobe puts short labels on the clickable
 screen: buttons, links, text fields, menu items, tabs and so on. Type a label and Tobe
 clicks that element. You don't need the mouse or trackpad.
 
-> **Status: early release (0.2.0).** Tobe has been tested on macOS 26 and 27 only. If you run
+> **Status: early release (0.2.1).** Tobe has been tested on macOS 26 and 27 only. If you run
 > into a problem, please [open an issue](https://github.com/hatohato25/tobe/issues).
 
 ## Requirements
