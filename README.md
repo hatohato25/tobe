@@ -1,5 +1,7 @@
 # Tobe
 
+English | [日本語](README.ja.md)
+
 **Tobe** — read as 飛べ ("Jump!") or as "to be".
 
 Tobe brings the hint mode of [Vimium](https://github.com/philc/vimium) to all of macOS.
