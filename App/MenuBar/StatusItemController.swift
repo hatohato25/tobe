@@ -5,7 +5,7 @@ import AppKit
 /// メニューの項目は Q-24 の暫定方針に従う。
 /// - 「Grant Accessibility Permission…」: 権限が未許可のときだけ出す。押すと案内画面を開く
 /// - 「Settings…」: `onOpenSettings` を呼ぶだけ（設定画面との結線は T54 の `SettingsModule`）
-/// - 「Quit Tobi」: `NSApp.terminate(nil)`
+/// - 「Quit Tobe」: `NSApp.terminate(nil)`
 ///
 /// 使い方（結線は T37 の `HotkeyModule`）:
 /// ```swift
@@ -58,7 +58,7 @@ final class StatusItemController: NSObject {
         super.init()
 
         // ユーザーが ⌘ ドラッグで動かした位置を、次回の起動でも保てるようにする
-        statusItem.autosaveName = "TobiStatusItem"
+        statusItem.autosaveName = "TobeStatusItem"
         statusItem.menu = makeMenu()
         apply(permission: permission)
         Log.app.info("ステータスアイテムを作成した")
@@ -100,7 +100,7 @@ final class StatusItemController: NSObject {
         menu.addItem(.separator())
 
         let quitItem = NSMenuItem(
-            title: String(localized: "Quit Tobi", comment: "Status menu: quits the app"),
+            title: String(localized: "Quit Tobe", comment: "Status menu: quits the app"),
             action: #selector(quitSelected),
             keyEquivalent: "q"
         )
@@ -123,9 +123,9 @@ final class StatusItemController: NSObject {
         let symbolName = isGranted ? Self.grantedSymbol : Self.notGrantedSymbol
         let description =
             isGranted
-            ? String(localized: "Tobi", comment: "Status item: accessibility description when permission is granted")
+            ? String(localized: "Tobe", comment: "Status item: accessibility description when permission is granted")
             : String(
-                localized: "Tobi (Accessibility permission required)",
+                localized: "Tobe (Accessibility permission required)",
                 comment: "Status item: accessibility description when permission is not granted"
             )
         if let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: description) {
@@ -137,7 +137,7 @@ final class StatusItemController: NSObject {
             // シンボルが無い OS でもアイテム自体は見えるように文字で出す
             Log.app.error("SF Symbol が見つからない: \(symbolName, privacy: .public)")
             button.image = nil
-            button.title = isGranted ? "Tobi" : "Tobi!"
+            button.title = isGranted ? "Tobe" : "Tobe!"
         }
         button.toolTip = description
         Log.app.info("ステータスアイテムの権限表示を更新した: \(String(describing: permission), privacy: .public)")

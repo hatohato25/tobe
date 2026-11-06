@@ -1,6 +1,6 @@
 #if DEBUG
     import AppKit
-    import TobiCore
+    import TobeCore
     import os
 
     /// `--translate-test`: 押したキーの keyCode・`KeyTranslator` が変換した文字・`HintKeyInput.classify` の結果をログに出す。
@@ -20,7 +20,7 @@
 
     @MainActor
     private final class TranslateTestSession {
-        private let logger = Logger(subsystem: "io.github.hatohato25.tobi", category: "debug")
+        private let logger = Logger(subsystem: "io.github.hatohato25.tobe", category: "debug")
         private let translator = KeyTranslator()
         private let window: NSWindow
 
@@ -31,7 +31,7 @@
                 backing: .buffered,
                 defer: false
             )
-            window.title = "Tobi --translate-test"
+            window.title = "Tobe --translate-test"
             // 閉じたときに解放させず、このセッションが所有する（NSWindow の既定は閉じると解放）。
             window.isReleasedWhenClosed = false
             let label = NSTextField(

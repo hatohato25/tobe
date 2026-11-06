@@ -1,7 +1,7 @@
 #if DEBUG
     import AppKit
     import ApplicationServices
-    import TobiCore
+    import TobeCore
 
     /// `--press-test`: `AXActionPerformer`（T46）で 2 つの要素を操作し、使った方法をログに出す。
     ///

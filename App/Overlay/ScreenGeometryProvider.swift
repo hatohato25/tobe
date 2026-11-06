@@ -1,6 +1,6 @@
 import AppKit
 import CoreGraphics
-import TobiCore
+import TobeCore
 
 /// 1 枚の画面について、グローバル座標の `ScreenGeometry` と、元の `NSScreen` を組にしたもの。
 ///

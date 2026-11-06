@@ -30,7 +30,7 @@ enum EventTapThread {
         let thread = Thread {
             run(context: context, generation: generation, completion: completion)
         }
-        thread.name = "io.github.hatohato25.tobi.EventTapThread"
+        thread.name = "io.github.hatohato25.tobe.EventTapThread"
         // キー入力を遅らせないよう、メインスレッドと同等の優先度で動かす
         thread.qualityOfService = .userInteractive
         thread.start()

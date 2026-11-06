@@ -1,7 +1,7 @@
 #if DEBUG
     import AppKit
     import CoreGraphics
-    import TobiCore
+    import TobeCore
 
     /// `--dump-screens`: 画面ごとの座標の情報をログ（category: debug）に出す（T43）。
     ///

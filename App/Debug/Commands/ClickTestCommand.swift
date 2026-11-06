@@ -1,7 +1,7 @@
 #if DEBUG
     import AppKit
     import ApplicationServices
-    import TobiCore
+    import TobeCore
 
     /// `--click-test`: TextEdit の本文の中心をマウスイベントでクリックする（T47。代替クリックの手動確認）。
     ///
@@ -54,7 +54,7 @@
 
             Self.logCursor("クリック後")
             Log.debug.notice(
-                "代替クリックを送った（印: \(TobiEventMarker.value, privacy: .public)）。TextEdit のキャレットが本文の中心へ移ったかを目で確かめる"
+                "代替クリックを送った（印: \(TobeEventMarker.value, privacy: .public)）。TextEdit のキャレットが本文の中心へ移ったかを目で確かめる"
             )
         }
 

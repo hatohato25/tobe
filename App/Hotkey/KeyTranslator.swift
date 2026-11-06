@@ -1,6 +1,6 @@
 import AppKit
 import Carbon
-import TobiCore
+import TobeCore
 import os
 
 /// keyCode をキーボードレイアウトに従って文字に変換し、`HintKeyInput` に分類する（design.md 7.6、D-7、F-4.8）。
@@ -19,7 +19,7 @@ import os
 /// `NSObject` を継承する。
 @MainActor
 final class KeyTranslator: NSObject {
-    private let logger = Logger(subsystem: "io.github.hatohato25.tobi", category: "hotkey")
+    private let logger = Logger(subsystem: "io.github.hatohato25.tobe", category: "hotkey")
     /// 変換に使うレイアウト。入力ソースの変更通知を受けたら作り直す。
     private var layoutState: LayoutState
 
@@ -32,7 +32,7 @@ final class KeyTranslator: NSObject {
         layoutState = Self.loadLayoutState()
         super.init()
         logLayoutState(reason: "初期化")
-        // Tobi はアクティブにならない（LSUIElement、フォーカスを奪わないオーバーレイ）。
+        // Tobe はアクティブにならない（LSUIElement、フォーカスを奪わないオーバーレイ）。
         // 既定の suspensionBehavior（coalesce）では、非アクティブの間は分散通知の配送が保留されるため、
         // 入力ソースを変えてもキャッシュが古いままになる。deliverImmediately で常に受け取る。
         DistributedNotificationCenter.default().addObserver(

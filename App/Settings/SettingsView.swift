@@ -5,7 +5,7 @@
 import AppKit
 import Observation
 import SwiftUI
-import TobiCore
+import TobeCore
 
 // MARK: - 設定画面
 
@@ -324,17 +324,17 @@ private enum SettingsStrings {
         localized: "Startup:", comment: "Settings: label of the row that contains the Open at Login toggle"
     )
     static let launchAtLogin = String(
-        localized: "Open at Login", comment: "Settings: toggle that registers Tobi as a login item"
+        localized: "Open at Login", comment: "Settings: toggle that registers Tobe as a login item"
     )
     static let launchAtLoginRequiresApproval = String(
-        localized: "Allow Tobi in System Settings > General > Login Items to open it at login.",
+        localized: "Allow Tobe in System Settings > General > Login Items to open it at login.",
         comment: "Settings: shown when the login item needs the user's approval"
     )
     static let openLoginItems = String(
         localized: "Open Login Items Settings…", comment: "Settings: button that opens System Settings > Login Items"
     )
     static let launchAtLoginNotFound = String(
-        localized: "Tobi couldn't find its login item. Move Tobi to the Applications folder and try again.",
+        localized: "Tobe couldn't find its login item. Move Tobe to the Applications folder and try again.",
         comment: "Settings: the login item service was not found (status notFound)"
     )
 
@@ -407,7 +407,7 @@ private enum SettingsStrings {
             SettingsLoadResult(settings: .defaults, issues: issues)
         }
 
-        func save(_ settings: TobiSettings) {}
+        func save(_ settings: TobeSettings) {}
     }
 
     /// プレビュー用のログイン時の起動。`SMAppService` を呼ばずに、決めた状態を返す。

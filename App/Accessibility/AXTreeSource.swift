@@ -1,6 +1,6 @@
 import ApplicationServices
 import Synchronization
-import TobiCore
+import TobeCore
 
 /// `AccessibilityTreeSource` の AX 実装（design.md 3.5、8.3、8.5、8.7）。`TreeWalker` が 1 ノードずつ読むのに使う。
 ///

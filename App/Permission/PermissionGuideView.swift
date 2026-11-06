@@ -107,22 +107,22 @@ struct PermissionGuideView: View {
 /// 日本語は後のタスクで String Catalog に訳を足す。
 private enum PermissionGuideStrings {
     static let title = String(
-        localized: "Accessibility Access for Tobi",
+        localized: "Accessibility Access for Tobe",
         comment: "Permission guide: window heading"
     )
     static let reason = String(
         localized: """
-            Tobi uses Accessibility to find and press buttons in other apps, \
+            Tobe uses Accessibility to find and press buttons in other apps, \
             and to receive the keys you type while hints are shown.
             """,
         comment: "Permission guide: why the permission is needed"
     )
     static let privacy = String(
-        localized: "Tobi never records or sends your keystrokes.",
+        localized: "Tobe never records or sends your keystrokes.",
         comment: "Permission guide: privacy statement"
     )
     static let noRestart = String(
-        localized: "Once you allow access, Tobi turns on automatically. No restart is needed.",
+        localized: "Once you allow access, Tobe turns on automatically. No restart is needed.",
         comment: "Permission guide: what happens after granting"
     )
     static let statusNotGranted = String(
@@ -130,11 +130,11 @@ private enum PermissionGuideStrings {
         comment: "Permission guide: status when not granted"
     )
     static let statusGranted = String(
-        localized: "Accessibility access is allowed. Tobi is ready.",
+        localized: "Accessibility access is allowed. Tobe is ready.",
         comment: "Permission guide: status when granted"
     )
     static let statusTapCreationFailed = String(
-        localized: "Access is allowed, but Tobi couldn't start listening for the trigger key. Please restart Tobi.",
+        localized: "Access is allowed, but Tobe couldn't start listening for the trigger key. Please restart Tobe.",
         comment: "Permission guide: status when the event tap could not be created"
     )
     static let openSettings = String(

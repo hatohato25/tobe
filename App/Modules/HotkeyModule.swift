@@ -1,4 +1,4 @@
-import TobiCore
+import TobeCore
 
 /// 起動キーの検出（CGEventTap）と、それを支える権限の確認・案内画面・ステータスアイテムを担当するモジュール。
 ///

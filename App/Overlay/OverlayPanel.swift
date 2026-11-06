@@ -6,7 +6,7 @@ import AppKit
 ///   この型は 1 枚のパネルと、その中の `HintOverlayView` を 1 つ作るだけ。
 /// - frame には `NSScreen.frame`（AppKit の座標）をそのまま渡す（design.md 9.1）。`NSScreen` の参照は持たない
 ///   （画面の構成が変わったら `ScreenGeometryProvider.currentSnapshots()` から作り直す）。
-/// - 表示・非表示は `present()` / `dismiss()`。どちらも Tobi をアクティブにせず、フォーカスを奪わない（F-3.7）。
+/// - 表示・非表示は `present()` / `dismiss()`。どちらも Tobe をアクティブにせず、フォーカスを奪わない（F-3.7）。
 ///
 /// 使い方:
 /// ```swift
@@ -61,7 +61,7 @@ final class OverlayPanel: NSPanel {
         frameRect
     }
 
-    /// Tobi をアクティブにせずに最前面へ出す。
+    /// Tobe をアクティブにせずに最前面へ出す。
     ///
     /// 先に描画を済ませてから出す。出した瞬間に、前回のセッションの絵や空の絵が一瞬見えるのを避けるため。
     func present() {

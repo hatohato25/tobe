@@ -8,7 +8,7 @@ import os
 /// Debug ビルドでは、登録済みの Debug 引数（`DebugCommandRegistry`）があるときだけ、
 /// `AppDelegate` の代わりに `DebugCommandHost` でそのコマンドを実行する。
 @main
-enum TobiMain {
+enum TobeMain {
     @MainActor
     static func main() {
         let application = NSApplication.shared
@@ -29,7 +29,7 @@ enum TobiMain {
                 launch = try DebugCommandRegistry.resolve(arguments: Array(CommandLine.arguments.dropFirst()))
             } catch {
                 // 打ち間違いなどを黙って無視して通常起動すると、意図した確認ができていないことに気付けないため終了する。
-                Logger(subsystem: "io.github.hatohato25.tobi", category: "debug").error(
+                Logger(subsystem: "io.github.hatohato25.tobe", category: "debug").error(
                     "起動引数が不正なため終了します: \(error.description, privacy: .public)"
                 )
                 exit(EXIT_FAILURE)

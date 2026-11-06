@@ -1,4 +1,4 @@
-import TobiCore
+import TobeCore
 
 /// 設定（`SettingsModel`）と設定画面（`SettingsWindowController`）を担当し、設定の値をほかのモジュールに結ぶモジュール。
 ///

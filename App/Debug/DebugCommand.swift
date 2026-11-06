@@ -6,7 +6,7 @@
     ///
     /// `run()` が戻ったら `DebugCommandHost` が終了コード 0 でプロセスを終える。投げたら終了コード 1 で終える。
     /// 表示し続けるコマンド（オーバーレイのデモなど）は、戻らずに待ち続けてよい（Ctrl-C などで止める）。
-    /// ログは `Logger(subsystem: "io.github.hatohato25.tobi", category:)` に出す。要素のタイトルなど
+    /// ログは `Logger(subsystem: "io.github.hatohato25.tobe", category:)` に出す。要素のタイトルなど
     /// 画面の内容は出さない（design.md 14）。
     /// `Sendable` は、型の対応表（`DebugCommandRegistry.commands`）を `static let` で持つために要る
     /// （`@MainActor` の型はもともと `Sendable` なので、実装側の負担はない）。

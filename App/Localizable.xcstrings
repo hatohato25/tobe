@@ -1,32 +1,32 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "Access is allowed, but Tobi couldn't start listening for the trigger key. Please restart Tobi.": {
+    "Access is allowed, but Tobe couldn't start listening for the trigger key. Please restart Tobe.": {
       "localizations": {
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "アクセスは許可されていますが、起動キーの検出を開始できませんでした。Tobi を再起動してください。"
+            "value": "アクセスは許可されていますが、起動キーの検出を開始できませんでした。Tobe を再起動してください。"
           }
         }
       }
     },
-    "Accessibility Access for Tobi": {
+    "Accessibility Access for Tobe": {
       "localizations": {
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tobi のアクセシビリティの許可"
+            "value": "Tobe のアクセシビリティの許可"
           }
         }
       }
     },
-    "Accessibility access is allowed. Tobi is ready.": {
+    "Accessibility access is allowed. Tobe is ready.": {
       "localizations": {
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "アクセシビリティが許可されました。Tobi を使えます。"
+            "value": "アクセシビリティが許可されました。Tobe を使えます。"
           }
         }
       }
@@ -41,12 +41,12 @@
         }
       }
     },
-    "Allow Tobi in System Settings > General > Login Items to open it at login.": {
+    "Allow Tobe in System Settings > General > Login Items to open it at login.": {
       "localizations": {
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "ログイン時に開くには、システム設定のログイン項目で Tobi を許可してください。"
+            "value": "ログイン時に開くには、システム設定のログイン項目で Tobe を許可してください。"
           }
         }
       }
@@ -181,12 +181,12 @@
         }
       }
     },
-    "Once you allow access, Tobi turns on automatically. No restart is needed.": {
+    "Once you allow access, Tobe turns on automatically. No restart is needed.": {
       "localizations": {
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "許可すると、Tobi は自動で使えるようになります。再起動は不要です。"
+            "value": "許可すると、Tobe は自動で使えるようになります。再起動は不要です。"
           }
         }
       }
@@ -221,12 +221,12 @@
         }
       }
     },
-    "Quit Tobi": {
+    "Quit Tobe": {
       "localizations": {
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tobi を終了"
+            "value": "Tobe を終了"
           }
         }
       }
@@ -331,62 +331,62 @@
         }
       }
     },
-    "Tobi": {
+    "Tobe": {
       "localizations": {
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tobi"
+            "value": "Tobe"
           }
         }
       }
     },
-    "Tobi (Accessibility permission required)": {
+    "Tobe (Accessibility permission required)": {
       "localizations": {
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tobi（アクセシビリティの許可が必要）"
+            "value": "Tobe（アクセシビリティの許可が必要）"
           }
         }
       }
     },
-    "Tobi Settings": {
+    "Tobe Settings": {
       "localizations": {
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tobi の設定"
+            "value": "Tobe の設定"
           }
         }
       }
     },
-    "Tobi couldn't find its login item. Move Tobi to the Applications folder and try again.": {
+    "Tobe couldn't find its login item. Move Tobe to the Applications folder and try again.": {
       "localizations": {
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "ログイン項目が見つかりませんでした。Tobi をアプリケーションフォルダに移動して、もう一度試してください。"
+            "value": "ログイン項目が見つかりませんでした。Tobe をアプリケーションフォルダに移動して、もう一度試してください。"
           }
         }
       }
     },
-    "Tobi never records or sends your keystrokes.": {
+    "Tobe never records or sends your keystrokes.": {
       "localizations": {
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tobi がキー入力を記録したり送信したりすることはありません。"
+            "value": "Tobe がキー入力を記録したり送信したりすることはありません。"
           }
         }
       }
     },
-    "Tobi uses Accessibility to find and press buttons in other apps, and to receive the keys you type while hints are shown.": {
+    "Tobe uses Accessibility to find and press buttons in other apps, and to receive the keys you type while hints are shown.": {
       "localizations": {
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tobi はアクセシビリティを使って、他のアプリのボタンを見つけて押したり、ラベルの表示中に打ったキーを受け取ったりします。"
+            "value": "Tobe はアクセシビリティを使って、他のアプリのボタンを見つけて押したり、ラベルの表示中に打ったキーを受け取ったりします。"
           }
         }
       }

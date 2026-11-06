@@ -5,7 +5,7 @@ import os
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     // subsystem は Debug / Release で同じ値にして、ログの絞り込み条件を共通にする。
-    private let logger = Logger(subsystem: "io.github.hatohato25.tobi", category: "App")
+    private let logger = Logger(subsystem: "io.github.hatohato25.tobe", category: "App")
 
     /// 開始に成功したモジュール（開始した順）。終了時はこの逆順で停止する。
     private var startedModules: [any AppModule] = []

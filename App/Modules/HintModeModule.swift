@@ -1,9 +1,9 @@
 import AppKit
-import TobiCore
+import TobeCore
 
 /// ヒントモード（要素の収集、ラベル表示、入力の絞り込み、操作の実行）を担当するモジュール（design.md 1.1、3.6、T48）。
 ///
-/// `HintModeCoordinator`（TobiCore）に App の実物のポートを渡し、`hotkey` の通知と画面の構成の変化を結ぶ。
+/// `HintModeCoordinator`（TobeCore）に App の実物のポートを渡し、`hotkey` の通知と画面の構成の変化を結ぶ。
 /// - 収集: `AXElementCollector`。収集した参照は `ElementHandleRegistry` に入り、操作のときに `AXActionPerformer` が引く。
 /// - 操作: `AXActionPerformer`。`AXPress` が非対応の要素は `MouseClickPoster` で中心をクリックする（T46 の注入口）。
 /// - 表示: `OverlayController`。Coordinator と**同じ** `ScreenGeometryProvider` から画面を読む（`ScreenID` をそろえるため）。
@@ -28,7 +28,7 @@ final class HintModeModule: AppModule {
     ///
     /// 設定画面がまだ結線されていないため、今は既定値を返す。`SettingsModule`（T54）が
     /// `SettingsModel` の値を返すクロージャに差し替える。いつ差し替えてもよく、差し替えた後に始まるセッションから使われる。
-    var settingsProvider: @MainActor () -> TobiSettings {
+    var settingsProvider: @MainActor () -> TobeSettings {
         get { settingsSource.read }
         set { settingsSource.read = newValue }
     }
@@ -255,5 +255,5 @@ final class HintModeModule: AppModule {
 @MainActor
 private final class SettingsSource {
     /// 設定画面がまだ結線されていないため、既定値を返す（T54 が差し替える）。
-    var read: @MainActor () -> TobiSettings = { TobiSettings.defaults }
+    var read: @MainActor () -> TobeSettings = { TobeSettings.defaults }
 }

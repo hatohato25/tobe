@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# TobiCore が OS に依存しないことを検査する（requirements.md N-6.1、design.md D-28）。
+# TobeCore が OS に依存しないことを検査する（requirements.md N-6.1、design.md D-28）。
 #
-#   scripts/check-core-imports.sh          Packages/TobiCore/Sources を検査する
+#   scripts/check-core-imports.sh          Packages/TobeCore/Sources を検査する
 #   scripts/check-core-imports.sh <DIR>    指定したディレクトリの *.swift を検査する（スクリプト自体の確認用）
 #
 # 次のどちらかが見つかったら、ファイル名・行番号・理由を表示して 1 で終了する。
@@ -14,7 +14,7 @@
 #     doc コメントには `CGEvent`・`NSScreen`・`AXUIElement` などの名前が説明として多く出てくるため
 #     （tasks.md の T30 への申し送り）。ブロックコメントも中身は説明文で、コードとして使われることはないので除く。
 #   - 文字列リテラルの中身（`"..."`・`"""..."""`・`#"..."#`）。文字列は OS の API を呼ばないため。
-#     TobiCore には AX のロール名を文字列で持つ箇所がある（Traversal/TreeWalker.swift の "AXValueIndicator" など）。
+#     TobeCore には AX のロール名を文字列で持つ箇所がある（Traversal/TreeWalker.swift の "AXValueIndicator" など）。
 #     これは比較に使うだけのデータで、ApplicationServices に依存しない。
 #     ただし文字列補間 `\( ... )` の中はコードなので検査する。
 #     文字列からクラスを動的に引く抜け道は、`NSClassFromString`・`dlsym` などを FORBIDDEN_APIS に入れて塞ぐ。
@@ -57,7 +57,7 @@ FORBIDDEN_APIS=(
     "CGPreflight|権限の確認は OS に依存する（App の PermissionMonitor の責務）"
     "CGRequest|権限の要求は OS に依存する（App の PermissionMonitor の責務）"
     "CGSession|ログインセッションの情報は OS に依存する"
-    "AXUIElement|AX API（ApplicationServices）。TobiCore は AccessibilityTreeSource などの protocol 越しに扱う"
+    "AXUIElement|AX API（ApplicationServices）。TobeCore は AccessibilityTreeSource などの protocol 越しに扱う"
     "AXObserver|AX API（ApplicationServices）"
     "AXValue|AX API（ApplicationServices）。AXValue のデコードは App の AXValueDecoder の責務"
     "AXIsProcessTrusted|アクセシビリティ権限の確認は OS に依存する"
@@ -74,7 +74,7 @@ FORBIDDEN_APIS=(
     "NSEvent|イベントは AppKit"
     "NSStatusBar|メニューバーの項目は AppKit"
     "NSStatusItem|メニューバーの項目は AppKit"
-    "NSColor|色は AppKit。TobiCore は RGBAColor を使う"
+    "NSColor|色は AppKit。TobeCore は RGBAColor を使う"
     "NSFont|フォントは AppKit"
     "TISCopy|入力ソースは Carbon（App の KeyTranslator の責務）"
     "TISGet|入力ソースは Carbon（App の KeyTranslator の責務）"
@@ -96,7 +96,7 @@ usage() {
 }
 
 case "$#" in
-    0) TARGET_DIR="${REPO_ROOT}/Packages/TobiCore/Sources" ;;
+    0) TARGET_DIR="${REPO_ROOT}/Packages/TobeCore/Sources" ;;
     1)
         if [[ "$1" == "-h" || "$1" == "--help" ]]; then
             usage
@@ -256,8 +256,8 @@ while IFS=$'\t' read -r file lineno code; do
 done <<<"$stripped"
 
 if ((violation_count > 0)); then
-    echo "TobiCore の依存の検査: ${violation_count} 件の違反（N-6.1、D-28）" >&2
+    echo "TobeCore の依存の検査: ${violation_count} 件の違反（N-6.1、D-28）" >&2
     exit 1
 fi
 
-echo "TobiCore の依存の検査: 違反なし（${#SWIFT_FILES[@]} ファイル）"
+echo "TobeCore の依存の検査: 違反なし（${#SWIFT_FILES[@]} ファイル）"

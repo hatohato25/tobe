@@ -1,6 +1,6 @@
 #if DEBUG
     import Foundation
-    import TobiCore
+    import TobeCore
 
     /// Debug ビルドだけのイベントタップの確認用フック（T34。手動確認は T38）。Release には含めない。
     ///

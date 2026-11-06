@@ -1,5 +1,5 @@
 import AppKit
-import TobiCore
+import TobeCore
 
 /// 失敗の通知を、システムの警告音で鳴らす（`FeedbackPlaying` の実装。design.md 3.5）。
 ///

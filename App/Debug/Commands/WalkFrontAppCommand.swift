@@ -1,7 +1,7 @@
 #if DEBUG
     import AppKit
     import ApplicationServices
-    import TobiCore
+    import TobeCore
 
     /// `--walk-front-app`: 前面のアプリを `TreeWalker` + `AXTreeSource` で走査し、ヒット数・ロール別件数・所要時間を
     /// ログ（category: collector）に出す（T41）。
@@ -162,7 +162,7 @@
             case .noFrontmostApp:
                 "前面のアプリがない"
             case .frontmostIsSelf:
-                "前面のアプリが Tobi 自身（対象のアプリを前面にしてから待つ）"
+                "前面のアプリが Tobe 自身（対象のアプリを前面にしてから待つ）"
             case .noScreen:
                 "画面がない"
             case .noWindow:

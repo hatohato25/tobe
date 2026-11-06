@@ -1,5 +1,5 @@
 import Foundation
-import TobiCore
+import TobeCore
 
 // 関連値のラベル `at` は design.md 7.1 で決めたインターフェース（`.triggered(at:)` と読めるようにする）。
 // 3 文字未満を禁じる identifier_name に掛かるため、この型の中だけ外す

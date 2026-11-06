@@ -1,8 +1,8 @@
-import TobiCore
+import TobeCore
 
 /// `HintModeCoordinator` が出す `HintModeLogEvent` を、`Log` のカテゴリとレベルに振り分ける（design.md 14 章、T48）。
 ///
-/// TobiCore はログの出し先を知らないので、Coordinator はこの値を `log` クロージャに渡すだけにしている。
+/// TobeCore はログの出し先を知らないので、Coordinator はこの値を `log` クロージャに渡すだけにしている。
 /// 出来事に含まれるのはセッションの番号・件数・時間・エラーの種類・ロールだけで、要素のタイトルや値はない。
 /// そのため、補間する値はすべて `privacy: .public` にしてよい（`windowListEntrySkipped` の理由も
 /// `WindowListParser` が固定の語彙と添字だけで作っている）。

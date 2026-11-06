@@ -1,6 +1,6 @@
 import Foundation
 import Observation
-import TobiCore
+import TobeCore
 
 /// 設定画面（T53）とアプリ（T54）が共有する設定の状態（S-0〜S-3、design.md 12.1・12.2）。
 ///
@@ -15,7 +15,7 @@ import TobiCore
 @Observable
 final class SettingsModel {
     /// 現在の設定。保存済みの値と常に一致する（検証に通らない入力では変わらない）。
-    private(set) var settings: TobiSettings
+    private(set) var settings: TobeSettings
 
     /// 起動時の読み込みで見つかった問題（S-0.3）。並びは `SettingsKey.allCases` の順。
     /// その項目には既定値を使っている。読み込みは起動時の 1 回だけなので、アプリを終了するまで変わらない。
@@ -51,7 +51,7 @@ final class SettingsModel {
 
     /// `loadIssues` を設定画面に出すための文（S-0.3）。並びは `loadIssues` と同じ。
     ///
-    /// `SettingsIssue` の `reason` は TobiCore の日本語の固定文で、ローカライズできないため画面には入れない（ログには出す）。
+    /// `SettingsIssue` の `reason` は TobeCore の日本語の固定文で、ローカライズできないため画面には入れない（ログには出す）。
     var loadIssueMessages: [String] {
         loadIssues.map(Self.message(for:))
     }
@@ -140,7 +140,7 @@ final class SettingsModel {
         )
     }
 
-    /// 全項目を既定値（`TobiSettings.defaults`）に戻して保存する（S-0.5）。起動キーはすぐに反映する。
+    /// 全項目を既定値（`TobeSettings.defaults`）に戻して保存する（S-0.5）。起動キーはすぐに反映する。
     /// ログイン時の起動は戻さない。設定の値ではなく、ユーザーが OS に登録した状態のため（D-22）。
     func resetToDefaults() {
         alphabetError = nil

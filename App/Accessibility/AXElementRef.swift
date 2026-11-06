@@ -10,8 +10,8 @@ import ApplicationServices
 /// - 唯一の例外はメッセージングのタイムアウトで、参照ごとの設定（V-3）がこの参照に結び付く。設定は
 ///   プロセス内の値の書き換えで、どのスレッドから行っても壊れない（最後に書いた値が効く）。
 ///
-/// この包みは App の Accessibility 以下（と、それを使う Debug コマンド）でだけ使い、TobiCore には出さない
-/// （TobiCore は `AccessibilityTreeSource.Node` として型を知らずに扱う）。
+/// この包みは App の Accessibility 以下（と、それを使う Debug コマンド）でだけ使い、TobeCore には出さない
+/// （TobeCore は `AccessibilityTreeSource.Node` として型を知らずに扱う）。
 struct AXElementRef: @unchecked Sendable {
     let raw: AXUIElement
 

@@ -2,7 +2,7 @@ import os
 
 /// ヒントモードの性能計測用の signpost（design.md 14 章、N-1）。
 ///
-/// Instruments の os_signpost（subsystem `io.github.hatohato25.tobi`、category `performance`）で見る。
+/// Instruments の os_signpost（subsystem `io.github.hatohato25.tobe`、category `performance`）で見る。
 /// - 区間 `hintSession`: 起動キーの判定時刻から、ヒントモードの終了（確定・取り消し・失敗）まで。
 /// - イベント `collected`: 収集の完了（`AXElementCollector`）。
 /// - イベント `hintsBuilt`: ラベルの割り当ての完了（`HintPipeline.makeHints` の後）。

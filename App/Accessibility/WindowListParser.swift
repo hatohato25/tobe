@@ -1,18 +1,18 @@
 import CoreGraphics
 import Foundation
-import TobiCore
+import TobeCore
 
 /// `CGWindowListCopyWindowInfo` の結果を分類した一覧（design.md 8.1・8.6）。
 ///
 /// どちらの一覧も `CGWindowList` の並び順（前面から）で、`zIndex` の昇順。
 /// `traversalTargets` の各要素は `occlusionWindows` にも同じ値で入っている。
 struct WindowListSnapshot: Equatable, Sendable {
-    /// 走査の対象: レイヤー 0、所有者が Tobi 以外、`kCGWindowAlpha > 0`（design.md 8.1 手順 2）。
+    /// 走査の対象: レイヤー 0、所有者が Tobe 以外、`kCGWindowAlpha > 0`（design.md 8.1 手順 2）。
     /// メニューバーと開いているメニューは含めない（収集側が `menuBarWindows` / `popUpMenuWindows(ownedBy:)` から
     /// 別の根として加える。T58）。
     let traversalTargets: [WindowInfo]
     /// 遮蔽の判定（`OcclusionFilter`）に渡す全レイヤーのウィンドウ。
-    /// `kCGWindowAlpha == 0` のウィンドウと Tobi 自身のウィンドウは除いてある。`OcclusionFilter` は alpha を見ずに
+    /// `kCGWindowAlpha == 0` のウィンドウと Tobe 自身のウィンドウは除いてある。`OcclusionFilter` は alpha を見ずに
     /// zIndex だけで前後を決めるため、入れると見えないウィンドウ（オーバーレイなど）で要素を遮蔽と誤判定する（T22）。
     let occlusionWindows: [WindowInfo]
     /// パースできずにスキップした項目（`windowListEntrySkipped`）。呼び出し側がログに出す。
@@ -50,7 +50,7 @@ extension WindowListSnapshot {
 enum WindowListParser {
     /// - Parameters:
     ///   - entries: `CGWindowListCopyWindowInfo` が返した配列（前面から順）。
-    ///   - ownPID: Tobi 自身のプロセス。このプロセスのウィンドウはどちらの一覧にも入れない（F-2.12）。
+    ///   - ownPID: Tobe 自身のプロセス。このプロセスのウィンドウはどちらの一覧にも入れない（F-2.12）。
     static func parse(_ entries: NSArray, ownPID: ProcessID) -> WindowListSnapshot {
         var traversalTargets: [WindowInfo] = []
         var occlusionWindows: [WindowInfo] = []

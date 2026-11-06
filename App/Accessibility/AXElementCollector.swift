@@ -7,7 +7,7 @@ import ApplicationServices
 import CoreGraphics
 import Dispatch
 import Synchronization
-import TobiCore
+import TobeCore
 import os
 
 /// `ElementCollecting` の AX 実装。画面に見えているウィンドウを列挙し、アプリ単位で並列に AX ツリーを走査する
@@ -18,7 +18,7 @@ import os
 /// 2. `ElementHandleRegistry.beginCollection()` で前の収集の対応を消す。
 /// 3. システム全体の IPC のタイムアウトを 50ms にする（`AXClient.applySystemWideMessagingTimeout()`。下の「タイムアウト」）。
 /// 4. `WindowEnumerator` でウィンドウを列挙し、前面の 1 枚に完全に覆われたウィンドウと、画面の外にあるウィンドウを除く。
-///    前面のアプリ（`NSWorkspace.frontmostApplication`。Tobi 自身なら無し）には、メニューバーと開いているメニューの
+///    前面のアプリ（`NSWorkspace.frontmostApplication`。Tobe 自身なら無し）には、メニューバーと開いているメニューの
 ///    ウィンドウも割り当てる（design.md 8.1 手順 2、D-31。下の「メニュー」）。
 /// 5. 所有者の PID ごとにまとめ、アプリごとに GCD のキュー（`.userInteractive`）で `AppCollectionJob` を実行し、
 ///    `withTaskGroup` で全部を待つ（同じアプリの中は前面のウィンドウから順に直列。D-12）。
@@ -178,7 +178,7 @@ struct AXElementCollector: ElementCollecting {
     /// メニューバーと開いているメニューを走査する、前面のアプリ（design.md 8.1 手順 2）。
     ///
     /// `NSWorkspace` は MainActor で読む（AppKit の状態で、通知で更新される）。呼び出し元の Coordinator は MainActor
-    /// なので、ここで待つのは MainActor への 1 回の切り替えだけ。前面が Tobi 自身（設定画面など）なら nil にする（F-2.12）。
+    /// なので、ここで待つのは MainActor への 1 回の切り替えだけ。前面が Tobe 自身（設定画面など）なら nil にする（F-2.12）。
     @MainActor
     private static func frontmostApplicationPID() -> ProcessID? {
         guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
@@ -639,7 +639,7 @@ extension AppCollectionJob {
     ///
     /// ヒットテストにしたのは、メニューバーのメニュー・サブメニュー・コンテキストメニューを同じ方法で見つけるため
     /// （AX ツリーでの位置がそれぞれ違う。メニューバーの項目の子、メニューの項目の子、アプリの子）。
-    /// アプリの要素でヒットテストするので、前面にある Tobi のオーバーレイには当たらない。
+    /// アプリの要素でヒットテストするので、前面にある Tobe のオーバーレイには当たらない。
     /// `AXMenu` が見つからない（メニューでないポップアップ）か、frame がウィンドウと 1pt 以内で一致しなければ根にしない。
     private func resolvePopUpMenuRoot(
         _ target: WindowTarget,
@@ -932,7 +932,7 @@ private struct AppCollection: Sendable {
 struct CollectionReport: Sendable {
     let elapsed: Duration
     let elementCount: Int
-    /// 列挙した走査の対象のウィンドウ（レイヤー 0、Tobi 以外、alpha > 0）の数。
+    /// 列挙した走査の対象のウィンドウ（レイヤー 0、Tobe 以外、alpha > 0）の数。
     let traversalTargetCount: Int
     /// 前面の 1 枚に完全に覆われていて走査しなかったウィンドウの数。
     let coveredWindowCount: Int
@@ -972,7 +972,7 @@ struct AppCollectionReport: Sendable {
     let sheets: SheetRootReport?
     let stopReason: WalkStopReason
     let readErrors: [AccessibilityReadError: Int]
-    /// 「属性なし」として扱った読み取り（型の不一致など）。TobiCore の診断には入れず、ログにだけ出す（T41 の申し送り）。
+    /// 「属性なし」として扱った読み取り（型の不一致など）。TobeCore の診断には入れず、ログにだけ出す（T41 の申し送り）。
     let issues: [AXAttributeIssue: Int]
     let elapsed: Duration
 

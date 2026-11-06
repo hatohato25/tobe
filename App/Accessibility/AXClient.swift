@@ -1,5 +1,5 @@
 import ApplicationServices
-import TobiCore
+import TobeCore
 
 /// AX の API の薄いラッパー（design.md 4 章、8.3、8.5、8.7）。
 ///
@@ -98,7 +98,7 @@ struct AXClient: Sendable {
 
     /// システム全体のメッセージングのタイムアウトを 50ms にする（design.md 8.5、D-29。起動時に 1 回。T42 が呼ぶ）。
     ///
-    /// Tobi のプロセスの中だけに効き、要素ごとの設定をしていない参照すべての既定値になる。
+    /// Tobe のプロセスの中だけに効き、要素ごとの設定をしていない参照すべての既定値になる。
     /// 設定し忘れた参照が既定の約 1.5 秒待つのを防ぐ安全網。
     func applySystemWideMessagingTimeout() throws(AccessibilityReadError) {
         try setMessagingTimeout(Self.systemWideMessagingTimeout, for: .systemWide())

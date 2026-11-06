@@ -1,6 +1,6 @@
 #if DEBUG
     import AppKit
-    import TobiCore
+    import TobeCore
 
     /// `--collect-once`: `AXElementCollector` で 1 回収集し、アプリごとのヒット数・時間・診断をログ（category:
     /// collector）に出す（T42）。

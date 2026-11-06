@@ -1,5 +1,5 @@
 import CoreGraphics
-import TobiCore
+import TobeCore
 
 /// 代替クリック（design.md 10 章の 4、F-5.2）。要素の中心へ左クリックのマウスイベントを送る。
 ///
@@ -9,8 +9,8 @@ import TobiCore
 ///   （`CGEvent` も同じ座標系。AppKit の左下原点への変換は要らない）。
 /// - イベントの元: `CGEventSource(stateID: .hidSystemState)`。ハードウェアの入力と同じ状態テーブルを使い、
 ///   相手のアプリには通常のクリックとして届く。
-/// - 送信先: `.cghidEventTap`。Tobi 自身のイベントタップ（`.cgSessionEventTap`）にも届くので、
-///   両方のイベントに `TobiEventMarker` を付け、タップ側（T34）が `pointerDown` として扱わないようにする。
+/// - 送信先: `.cghidEventTap`。Tobe 自身のイベントタップ（`.cgSessionEventTap`）にも届くので、
+///   両方のイベントに `TobeEventMarker` を付け、タップ側（T34）が `pointerDown` として扱わないようにする。
 /// - カーソルは元の位置に戻さない（暫定 Q-17）。対象アプリのアクティブ化もしない（暫定 Q-18）。
 ///
 /// スレッド: 状態を持たない `Sendable` の値型で、MainActor に隔離しない。`CGEvent` の生成と `post` は
@@ -50,7 +50,7 @@ struct MouseClickPoster: Sendable {
         // クリック回数を明示的に 1 にする。AppKit のアプリは clickCount で 1 回のクリックか二重クリックかを決めるため、
         // 生成時の既定値に頼らず「1 回のクリック」と確定させる
         event.setIntegerValueField(.mouseEventClickState, value: 1)
-        TobiEventMarker.mark(event)
+        TobeEventMarker.mark(event)
         return event
     }
 }

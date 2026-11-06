@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 import Synchronization
-import TobiCore
+import TobeCore
 
 /// タップの CF オブジェクト（design.md 4 章・13 章、D-23）。
 ///
@@ -279,8 +279,8 @@ final class TapContext: Sendable {
     /// マウスボタンの押下。起動キーの判定を取り消し（暫定 Q-2: ⌘ クリックで起動しない）、
     /// キー破棄が ON なら `.pointerDown` を送る（暫定 Q-10）。
     private func handlePointerDown(event: CGEvent, at now: Timestamp) {
-        // Tobi 自身の代替クリック（MouseClickPoster）は、ユーザーのクリックとして扱わない（design.md 10 章）
-        guard !TobiEventMarker.isMarked(event) else { return }
+        // Tobe 自身の代替クリック（MouseClickPoster）は、ユーザーのクリックとして扱わない（design.md 10 章）
+        guard !TobeEventMarker.isMarked(event) else { return }
         let isSuppressing = state.withLock { shared in
             _ = shared.detector.handle(.pointerDown(at: now))
             return shared.isSuppressing

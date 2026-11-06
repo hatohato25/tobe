@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tobi のリリース用 zip を作る（design.md 16.2、N-7.1〜N-7.3）。
+# Tobe のリリース用 zip を作る（design.md 16.2、N-7.1〜N-7.3）。
 #
 #   scripts/release.sh            アーカイブ → 取り出し → 署名の検証 → zip → sha256
 #   scripts/release.sh --dry-run  実行するコマンドを表示するだけ（何も生成・変更しない）
@@ -15,7 +15,7 @@ set -euo pipefail
 # project.yml / Config/Base.xcconfig（Config/Local.xcconfig の上書きを含む）から
 # `xcodebuild -showBuildSettings` で読み取る。値を二重に持つと、設定を変えたときに
 # 検証が古い値と比べてしまうため、スクリプトには書かない。
-readonly SCHEME="Tobi"
+readonly SCHEME="Tobe"
 readonly CONFIGURATION="Release"
 
 # リポジトリのルートで動かす（どこから呼ばれても同じパスになるように）

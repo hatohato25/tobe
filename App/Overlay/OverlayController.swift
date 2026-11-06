@@ -1,5 +1,5 @@
 import AppKit
-import TobiCore
+import TobeCore
 
 /// ヒントのラベルを、画面ごとの `OverlayPanel` に配って表示する（`HintOverlayPresenting` の実装。design.md 9.2・9.3、D-16）。
 ///

@@ -1,5 +1,5 @@
 import Synchronization
-import TobiCore
+import TobeCore
 
 /// 収集した要素の `ElementID` と AX の参照（`AXElementRef`）の対応表（design.md 6 章の表、13 章、F-5）。
 ///

@@ -3,7 +3,7 @@
 // 使い方: このファイルを Config/Local.xcconfig にコピーして編集する（Local.xcconfig は .gitignore 対象）。
 // Config/Base.xcconfig の末尾から `#include? "Local.xcconfig"` で読み込まれ、Base の値を上書きする。
 //
-// 例: 「Tobi Self-Signed」以外の自分のコード署名証明書で署名する。
+// 例: 「Tobe Self-Signed」以外の自分のコード署名証明書で署名する。
 // 証明書名は `security find-identity -v -p codesigning` で確認できる。
 // ad-hoc 署名（"-"）は指定しないこと（ビルドごとにアクセシビリティの許可が外れる。design.md 11）。
 

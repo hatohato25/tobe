@@ -1,10 +1,10 @@
-// Tobi の共通ビルド設定（Debug / Release の両方に適用。project.yml の configFiles で指定）
+// Tobe の共通ビルド設定（Debug / Release の両方に適用。project.yml の configFiles で指定）
 //
-// 署名は自己署名証明書「Tobi Self-Signed」で行う（design.md 11、16.1、D-26）。
+// 署名は自己署名証明書「Tobe Self-Signed」で行う（design.md 11、16.1、D-26）。
 // ad-hoc 署名（"-"）だとビルドごとに cdhash が変わり、アクセシビリティの許可（TCC）が外れるため使わない。
 // 証明書がキーチェーンにない場合は、ad-hoc 署名に切り替わらず、ビルドが署名エラーで止まる。
 
-CODE_SIGN_IDENTITY = Tobi Self-Signed
+CODE_SIGN_IDENTITY = Tobe Self-Signed
 
 // Debug ビルドで実行ファイルを「起動用の小さな本体」と `<名前>.debug.dylib` に分けない（Xcode のプレビュー用の仕組み）。
 // Hardened Runtime のライブラリ検証は、読み込む dylib が本体と同じ Team ID で署名されていることを求める。

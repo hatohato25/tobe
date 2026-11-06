@@ -1,5 +1,5 @@
 import Dispatch
-import TobiCore
+import TobeCore
 
 /// `ActionPerforming` の実装（design.md 10 章、F-5.1、F-5.2、D-19）。確定した要素を `AXPress` し、
 /// 押せない要素（`actionUnsupported`）だけ代替クリックで操作する。

@@ -1,6 +1,6 @@
 import AppKit
 import CoreGraphics
-import TobiCore
+import TobeCore
 
 /// 1 枚の画面に出すラベルを、`draw(_:)` でまとめて描くビュー（design.md 9.3、D-17）。
 ///

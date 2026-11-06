@@ -1,7 +1,7 @@
 #if DEBUG
     import AppKit
     import ApplicationServices
-    import TobiCore
+    import TobeCore
 
     /// `--ax-selftest`: AX のラッパー（`AXClient` / `AXValueDecoder`）の動作確認（T40）。
     ///
@@ -17,7 +17,7 @@
     /// Finder にウィンドウを 1 つ開いた状態で実行する（Finder を前面にする必要はない）。
     struct AXSelfTestCommand: DebugCommand {
         private static let finderBundleID = "com.apple.finder"
-        private static let missingAttribute = "AXTobiNonexistentAttribute"
+        private static let missingAttribute = "AXTobeNonexistentAttribute"
 
         func run() async throws {
             guard AXIsProcessTrusted() else { throw AXSelfTestError.notTrusted }

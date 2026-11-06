@@ -1,6 +1,6 @@
 #if DEBUG
     import AppKit
-    import TobiCore
+    import TobeCore
     import os
 
     /// `--dump-windows`: `WindowEnumerator` の結果（走査の対象・遮蔽の判定用の一覧・スキップした項目）を、前面から順にログに出す。

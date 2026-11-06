@@ -1,5 +1,5 @@
 import ApplicationServices
-import TobiCore
+import TobeCore
 
 /// `AXValueDecoder` が変換する先の型。型の不一致を報告するときに、期待した型を示す。
 enum AXValueKind: String, Hashable, Sendable {

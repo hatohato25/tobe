@@ -1,6 +1,6 @@
 import AppKit
 import Synchronization
-import TobiCore
+import TobeCore
 
 /// Electron アプリと Chromium 系のブラウザに、画面の中身をアクセシビリティツリーへ公開するよう頼む（W-1）。
 ///

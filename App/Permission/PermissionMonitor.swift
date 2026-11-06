@@ -12,7 +12,7 @@ enum PermissionStatus: Sendable, Equatable {
 /// アクセシビリティ権限を 1 秒間隔で確認し、状態の変化を通知する（design.md 4 章・11 章、N-3.3、N-3.4）。
 ///
 /// - 判定は `AXIsProcessTrusted()` だけで行う。`CGPreflightPostEventAccess()` は取り消した後も `true` のまま、
-///   `CGPreflightListenEventAccess()` は入力監視の状態で Tobi では常に `false` のため（V-7、design.md 11 章）。
+///   `CGPreflightListenEventAccess()` は入力監視の状態で Tobe では常に `false` のため（V-7、design.md 11 章）。
 ///   この 2 つは原因の切り分けのため、変化のときにログにだけ残す。
 /// - 許可の前後とも同じ 1 秒間隔で確認する。実行中の取り消しも、ウォッチドッグ（T34、design.md 7.4）が
 ///   この通知で知る。権限の変更を知らせる公式の通知はないため、ポーリングする（D-20。`AXIsProcessTrusted()` は軽い）。

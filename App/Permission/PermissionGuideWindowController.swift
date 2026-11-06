@@ -49,7 +49,7 @@ final class PermissionGuideWindowController: NSObject, NSWindowDelegate {
         )
         super.init()
 
-        window.title = String(localized: "Tobi", comment: "Permission guide: window title")
+        window.title = String(localized: "Tobe", comment: "Permission guide: window title")
         // 閉じても使い回す（再び未許可になったときに同じウィンドウを出す）
         window.isReleasedWhenClosed = false
         // ユーザーがいま見ている Space に出す
@@ -71,7 +71,7 @@ final class PermissionGuideWindowController: NSObject, NSWindowDelegate {
         if !window.isVisible {
             window.center()
         }
-        // Tobi は LSUIElement のアプリで、ふだんはアクティブにならない。ほかのアプリの後ろに隠れないよう、
+        // Tobe は LSUIElement のアプリで、ふだんはアクティブにならない。ほかのアプリの後ろに隠れないよう、
         // アプリをアクティブにしてから前面に出す
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
@@ -97,7 +97,7 @@ final class PermissionGuideWindowController: NSObject, NSWindowDelegate {
     // MARK: - ボタン
 
     private func openSystemSettings() {
-        // アクセシビリティの一覧に Tobi を載せるため、プロンプト付きの確認を 1 回呼ぶ（design.md 11 章）。
+        // アクセシビリティの一覧に Tobe を載せるため、プロンプト付きの確認を 1 回呼ぶ（design.md 11 章）。
         // kAXTrustedCheckOptionPrompt はグローバル変数で Swift 6 の並行性の検査に掛かるため、キーは文字列で書く
         let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
         let trusted = AXIsProcessTrustedWithOptions(options)

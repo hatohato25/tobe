@@ -8,7 +8,7 @@
     /// 通常のモジュール（イベントタップなど）は起動しない。
     @MainActor
     final class DebugCommandHost: NSObject, NSApplicationDelegate {
-        private let logger = Logger(subsystem: "io.github.hatohato25.tobi", category: "debug")
+        private let logger = Logger(subsystem: "io.github.hatohato25.tobe", category: "debug")
         private let argument: String
         private let commandType: any DebugCommand.Type
 

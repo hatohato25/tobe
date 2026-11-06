@@ -13,7 +13,7 @@ import SwiftUI
 /// - ウィンドウは使い回す。閉じても解放せず、`show()` で同じウィンドウを前面に出す。
 /// - 閉じた状態から開くたびに、入力欄の下書きを保存済みの値に戻す（`SettingsView.sessionID`）。
 /// - ログイン時の起動の状態は保存しないので、開いたときと、表示中にアプリがアクティブになったときに読み直す（S-4.2）。
-///   システム設定で外してから Tobi に戻ると、トグルの表示が実態に追従する。
+///   システム設定で外してから Tobe に戻ると、トグルの表示が実態に追従する。
 ///
 /// スレッド: MainActor でだけ使う。
 @MainActor
@@ -43,7 +43,7 @@ final class SettingsWindowController: NSObject {
         )
         super.init()
 
-        window.title = String(localized: "Tobi Settings", comment: "Settings: window title")
+        window.title = String(localized: "Tobe Settings", comment: "Settings: window title")
         // 閉じても使い回す（メニューの「設定…」から何度でも開く）
         window.isReleasedWhenClosed = false
         // ユーザーがいま見ている Space に出す
@@ -76,7 +76,7 @@ final class SettingsWindowController: NSObject {
             window.center()
         }
         launchAtLogin.refresh()
-        // Tobi は LSUIElement のアプリで、ふだんはアクティブにならない。ほかのアプリの後ろに隠れないよう、
+        // Tobe は LSUIElement のアプリで、ふだんはアクティブにならない。ほかのアプリの後ろに隠れないよう、
         // アプリをアクティブにしてから前面に出す
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
@@ -95,7 +95,7 @@ final class SettingsWindowController: NSObject {
 
 /// 設定画面のウィンドウ。編集のキー操作（⌘X / ⌘C / ⌘V / ⌘A / ⌘Z）と ⌘W を受ける。
 ///
-/// Tobi は LSUIElement のアプリでメインメニューを持たない。macOS はこれらのキー操作をメインメニューの
+/// Tobe は LSUIElement のアプリでメインメニューを持たない。macOS はこれらのキー操作をメインメニューの
 /// 「編集」の項目で処理するため、メニューがないと文字セットの欄でコピーや貼り付けができない。
 /// ここで同じアクションをレスポンダチェーンに送る。
 private final class SettingsWindow: NSWindow {

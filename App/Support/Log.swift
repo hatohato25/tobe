@@ -4,15 +4,15 @@ import os
 ///
 /// 使い方: `Log.hotkey.notice("イベントタップを作成した")`
 ///
-/// - subsystem は Debug・Release とも `io.github.hatohato25.tobi`（Debug のバンドル ID `…tobi.debug` は使わない）。
-///   ビルドの種類によらずログの絞り込み条件（`subsystem:io.github.hatohato25.tobi`）を共通にするため。
+/// - subsystem は Debug・Release とも `io.github.hatohato25.tobe`（Debug のバンドル ID `…tobe.debug` は使わない）。
+///   ビルドの種類によらずログの絞り込み条件（`subsystem:io.github.hatohato25.tobe`）を共通にするため。
 /// - 要素のタイトル・値、ユーザーが打った文字はログに出さない。出すのはロール、件数、時間、エラーの種類だけにする。
 ///   文字列を補間するときは、固定の語彙（エラーの case 名、ロールなど）にだけ `privacy: .public` を付ける。
 ///
 /// `Logger` は `Sendable` なので、`static let` で持ってどのスレッド（イベントタップのスレッドや GCD のキュー）からでも使える。
 enum Log {
     /// ログの subsystem。`Signposts` も同じ値を使う。
-    static let subsystem = "io.github.hatohato25.tobi"
+    static let subsystem = "io.github.hatohato25.tobe"
 
     /// アプリの組み立て（モジュールの開始・停止）。既存の `AppDelegate` の category と同じ値。
     static let app = Logger(subsystem: subsystem, category: "App")
