@@ -118,6 +118,7 @@ struct AXElementCollector: ElementCollecting {
             traversalTargetCount: snapshot.traversalTargets.count,
             coveredWindowCount: plan.coveredWindowCount,
             offscreenWindowCount: plan.offscreenWindowCount,
+            ignoredOverlayCount: snapshot.ignoredOverlayCount,
             hasScreens: plan.hasScreens,
             apps: apps.map(\.report)
         )
@@ -192,11 +193,7 @@ struct AXElementCollector: ElementCollecting {
     /// （AppKit の座標からの変換は `ScreenGeometryProvider` の 1 か所だけ。これは変換ではない）。
     /// `NSScreen` は MainActor でしか読めないため、MainActor の外で動く収集では CoreGraphics から読む。
     private static func activeDisplayUnion() -> CGRect? {
-        var count: UInt32 = 0
-        guard CGGetActiveDisplayList(0, nil, &count) == .success, count > 0 else { return nil }
-        var displays = [CGDirectDisplayID](repeating: 0, count: Int(count))
-        guard CGGetActiveDisplayList(count, &displays, &count) == .success else { return nil }
-        let bounds = displays.prefix(Int(count)).map { CGDisplayBounds($0) }
+        let bounds = WindowEnumerator.activeDisplayBounds()
         guard let first = bounds.first else { return nil }
         return bounds.dropFirst().reduce(first) { $0.union($1) }
     }
@@ -938,6 +935,8 @@ struct CollectionReport: Sendable {
     let coveredWindowCount: Int
     /// 画面の外にあって走査しなかったウィンドウの数。
     let offscreenWindowCount: Int
+    /// 遮蔽の判定から除いた、画面共有や画面収録の重ねウィンドウの数（D-33）。
+    let ignoredOverlayCount: Int
     /// 有効なディスプレイが取れたか（取れなければ何も走査していない）。
     let hasScreens: Bool
     /// 前面のアプリから順。
@@ -946,7 +945,8 @@ struct CollectionReport: Sendable {
     func logLines() -> [String] {
         var lines = [
             "収集: \(elapsed)、要素 \(elementCount) 件、アプリ \(apps.count) 件、"
-                + "ウィンドウ \(traversalTargetCount) 件（覆われて省略 \(coveredWindowCount)、画面外 \(offscreenWindowCount)）"
+                + "ウィンドウ \(traversalTargetCount) 件（覆われて省略 \(coveredWindowCount)、画面外 \(offscreenWindowCount)、"
+                + "重ねウィンドウを無視 \(ignoredOverlayCount)）"
                 + (hasScreens ? "" : "、有効なディスプレイなし")
         ]
         for app in apps {

@@ -24,6 +24,16 @@ struct WindowEnumerator: Sendable {
             throw .windowListUnavailable
         }
         // CFArray は NSArray と toll-free bridge なので、この変換は失敗しない（項目の型は parser が確かめる）。
-        return WindowListParser.parse(list as NSArray, ownPID: ownPID)
+        let screens = Self.activeDisplayBounds().map { GlobalRect(rect: $0) }
+        return WindowListParser.parse(list as NSArray, ownPID: ownPID, screens: screens)
+    }
+
+    /// 有効なディスプレイの範囲（AX と同じグローバル座標）。取れなければ空。
+    static func activeDisplayBounds() -> [CGRect] {
+        var count: UInt32 = 0
+        guard CGGetActiveDisplayList(0, nil, &count) == .success, count > 0 else { return [] }
+        var displays = [CGDirectDisplayID](repeating: 0, count: Int(count))
+        guard CGGetActiveDisplayList(count, &displays, &count) == .success else { return [] }
+        return displays.prefix(Int(count)).map { CGDisplayBounds($0) }
     }
 }

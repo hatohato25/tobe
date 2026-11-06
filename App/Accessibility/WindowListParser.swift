@@ -15,6 +15,8 @@ struct WindowListSnapshot: Equatable, Sendable {
     /// `kCGWindowAlpha == 0` のウィンドウと Tobe 自身のウィンドウは除いてある。`OcclusionFilter` は alpha を見ずに
     /// zIndex だけで前後を決めるため、入れると見えないウィンドウ（オーバーレイなど）で要素を遮蔽と誤判定する（T22）。
     let occlusionWindows: [WindowInfo]
+    /// どちらの一覧からも除いた、画面共有や画面収録の重ねウィンドウの数（D-33）。
+    let ignoredOverlayCount: Int
     /// パースできずにスキップした項目（`windowListEntrySkipped`）。呼び出し側がログに出す。
     let diagnostics: [CollectionDiagnostic]
 }
@@ -51,9 +53,11 @@ enum WindowListParser {
     /// - Parameters:
     ///   - entries: `CGWindowListCopyWindowInfo` が返した配列（前面から順）。
     ///   - ownPID: Tobe 自身のプロセス。このプロセスのウィンドウはどちらの一覧にも入れない（F-2.12）。
-    static func parse(_ entries: NSArray, ownPID: ProcessID) -> WindowListSnapshot {
+    ///   - screens: 有効なディスプレイの範囲。全画面の重ねウィンドウの判定に使う（D-33）。
+    static func parse(_ entries: NSArray, ownPID: ProcessID, screens: [GlobalRect]) -> WindowListSnapshot {
         var traversalTargets: [WindowInfo] = []
         var occlusionWindows: [WindowInfo] = []
+        var ignoredOverlayCount = 0
         var diagnostics: [CollectionDiagnostic] = []
 
         for (index, element) in entries.enumerated() {
@@ -69,6 +73,13 @@ enum WindowListParser {
             }
 
             guard entry.window.ownerPID != ownPID, entry.alpha > 0 else { continue }
+            guard
+                entry.ownerName != Self.screenCaptureOwnerName,
+                !OcclusionFilter.isFullScreenOverlay(entry.window, screens: screens)
+            else {
+                ignoredOverlayCount += 1
+                continue
+            }
             occlusionWindows.append(entry.window)
             if entry.window.layer == 0 {
                 traversalTargets.append(entry.window)
@@ -78,14 +89,20 @@ enum WindowListParser {
         return WindowListSnapshot(
             traversalTargets: traversalTargets,
             occlusionWindows: occlusionWindows,
+            ignoredOverlayCount: ignoredOverlayCount,
             diagnostics: diagnostics
         )
     }
+
+    /// ⌘⇧5 の収録を担うコマンドのプロセス名。レイヤー 0 にも画面大のウィンドウを置くので、大きさでは見分けられない（D-33）。
+    private static let screenCaptureOwnerName = "screencapture"
 
     private struct ParsedEntry {
         let window: WindowInfo
         /// `kCGWindowAlpha`。`WindowInfo` には持たせず、分類にだけ使う。
         let alpha: Double
+        /// `kCGWindowOwnerName`。API の仕様で省略されることがあるので、ないときは nil のまま扱う。
+        let ownerName: String?
     }
 
     private enum EntryFailure: Error, CustomStringConvertible {
@@ -123,7 +140,8 @@ enum WindowListParser {
                 layer: layer,
                 zIndex: zIndex
             )
-            return .success(ParsedEntry(window: window, alpha: alpha))
+            let ownerName = dictionary.object(forKey: kCGWindowOwnerName) as? String
+            return .success(ParsedEntry(window: window, alpha: alpha, ownerName: ownerName))
         } catch {
             return .failure(error)
         }

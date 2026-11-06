@@ -35,6 +35,16 @@ public enum OcclusionFilter {
         }
     }
 
+    /// 画面全体に重ねられた、通常のレイヤーより上のウィンドウか（D-33）。
+    ///
+    /// 画面共有（Slack のハドルなど）や ⌘⇧5 は、画面全体を覆う見えないウィンドウを手前に置く。遮蔽の判定に入れると、
+    /// すべての要素が隠れていることになってラベルが出ないため、呼び出し側で判定の入力から除く。
+    /// クリックを素通りさせるかどうかはウィンドウの一覧からは分からないので、位置と大きさで見分ける。
+    /// 全画面表示の通常のアプリはレイヤー 0 なので、ここには当てはまらない。
+    public static func isFullScreenOverlay(_ window: WindowInfo, screens: [GlobalRect]) -> Bool {
+        window.layer > 0 && screens.contains { !$0.rect.isEmpty && window.frame.rect.contains($0.rect) }
+    }
+
     /// `window` が、それより前面にある 1 枚のウィンドウに完全に覆われているか。覆われていれば走査自体を省く
     /// （design.md 8.1 の手順 3）。
     ///

@@ -255,6 +255,61 @@ struct OcclusionMenuTests {
     }
 }
 
+@Suite("OcclusionFilter.isFullScreenOverlay（D-33）")
+struct OcclusionFullScreenOverlayTests {
+    private let main = GlobalRect(rect: CGRect(x: 0, y: 0, width: 3440, height: 1440))
+    private let left = GlobalRect(rect: CGRect(x: -1920, y: 0, width: 1920, height: 1080))
+
+    @Test("Slack のハドルや ⌘⇧5 のように、レイヤーが 0 より上で画面全体を覆うウィンドウは true", arguments: [20, 24, 1000, 1498])
+    func coversScreenAboveNormalLayer(layer: Int) {
+        let overlay = window(1, zIndex: 0, rect: main.rect, layer: layer)
+
+        #expect(OcclusionFilter.isFullScreenOverlay(overlay, screens: [main]))
+    }
+
+    @Test("全画面表示の通常のアプリ（レイヤー 0）は false")
+    func normalFullScreenApp() {
+        let app = window(1, zIndex: 0, rect: main.rect)
+
+        #expect(!OcclusionFilter.isFullScreenOverlay(app, screens: [main]))
+    }
+
+    @Test(
+        "画面より小さいウィンドウは false",
+        arguments: [
+            CGRect(x: 0, y: 0, width: 3440, height: 30),  // メニューバー
+            CGRect(x: 0, y: 30, width: 3440, height: 1410),  // メニューバーを除く範囲
+            CGRect(x: 1000, y: 500, width: 620, height: 60),  // ハドルの操作パネル
+        ])
+    func smallerThanScreen(rect: CGRect) {
+        let panel = window(1, zIndex: 0, rect: rect, layer: 1000)
+
+        #expect(!OcclusionFilter.isFullScreenOverlay(panel, screens: [main]))
+    }
+
+    @Test("複数のディスプレイでは、どれか 1 枚を覆っていれば true")
+    func coversOneOfScreens() {
+        let overlay = window(1, zIndex: 0, rect: left.rect, layer: 1000)
+
+        #expect(OcclusionFilter.isFullScreenOverlay(overlay, screens: [main, left]))
+    }
+
+    @Test("ディスプレイが取れなければ false")
+    func noScreens() {
+        let overlay = window(1, zIndex: 0, rect: main.rect, layer: 1000)
+
+        #expect(!OcclusionFilter.isFullScreenOverlay(overlay, screens: []))
+    }
+
+    @Test("面積 0 の画面は覆っていることにしない")
+    func emptyScreen() {
+        let overlay = window(1, zIndex: 0, rect: main.rect, layer: 1000)
+        let empty = GlobalRect(rect: CGRect(x: 100, y: 100, width: 0, height: 0))
+
+        #expect(!OcclusionFilter.isFullScreenOverlay(overlay, screens: [empty]))
+    }
+}
+
 @Suite("OcclusionFilter.isFullyCovered（design.md 8.1 の手順 3）")
 struct OcclusionFullyCoveredTests {
     private let target = window(2, zIndex: 1, rect: CGRect(x: 100, y: 100, width: 400, height: 300))

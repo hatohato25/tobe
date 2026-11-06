@@ -9,7 +9,7 @@ Tap the right Command key on its own and Tobe puts short labels on the clickable
 screen: buttons, links, text fields, menu items, tabs and so on. Type a label and Tobe
 clicks that element. You don't need the mouse or trackpad.
 
-> **Status: early release (0.2.1).** Tobe has been tested on macOS 26 and 27 only. If you run
+> **Status: early release (0.2.2).** Tobe has been tested on macOS 26 and 27 only. If you run
 > into a problem, please [open an issue](https://github.com/hatohato25/tobe/issues).
 
 ## Requirements
@@ -123,6 +123,9 @@ English otherwise.
   whole window themselves (for example with Metal) instead of using standard macOS controls.
   They don't make their contents available to accessibility tools, so only the window frame
   gets labels.
+- **Screen recording:** Labels might not appear in recordings made with ⌘⇧5, even though they
+  appear on your screen. To include them, record with
+  `screencapture -V <seconds> <file>.mov` instead.
 - **Multiple displays:** Tobe has been tested with two displays. It hasn't been tested with
   a mix of Retina and non-Retina displays, or with the "Displays have separate Spaces" setting
   turned off.
