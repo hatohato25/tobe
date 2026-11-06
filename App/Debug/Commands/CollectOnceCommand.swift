@@ -18,7 +18,7 @@
         func run() async throws {
             let logger = Log.collector
             let registry = ElementHandleRegistry()
-            let collector = AXElementCollector(registry: registry, electronEnabler: ElectronAccessibilityEnabler())
+            let collector = AXElementCollector(registry: registry, contentEnabler: ContentAccessibilityEnabler())
             let start = ContinuousClock.now
             let outcome = try await collector.collectWithReport(deadline: start.advanced(by: Self.deadline))
             let elapsed = start.duration(to: .now)

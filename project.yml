@@ -4,7 +4,7 @@ name: Tobi
 options:
   bundleIdPrefix: io.github.hatohato25 # Q-27
   deploymentTarget:
-    macOS: "27.0"
+    macOS: "15.0"
   createIntermediateGroups: true
   developmentLanguage: en
 configFiles:
@@ -14,7 +14,7 @@ configFiles:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MACOSX_DEPLOYMENT_TARGET: "27.0"
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
 packages:
   TobiCore:
@@ -47,8 +47,8 @@ targets:
         # Info.plist は XcodeGen が info.properties から生成するため、INFOPLIST_KEY_* は効かない。
         # 表示名は独自の設定値を経由して Info.plist に渡す。
         TOBI_DISPLAY_NAME: Tobi
-        MARKETING_VERSION: 0.1.0
-        CURRENT_PROJECT_VERSION: 2
+        MARKETING_VERSION: 0.1.1
+        CURRENT_PROJECT_VERSION: 3
         ENABLE_HARDENED_RUNTIME: YES # 公証はしないが有効にしておく（D-26）
         ENABLE_APP_SANDBOX: NO # AX API とイベントタップのため（C-1）。entitlements ファイルは作らない（D-25）
         CODE_SIGN_STYLE: Manual # 署名 ID は Config/Base.xcconfig（D-26）

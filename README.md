@@ -5,12 +5,12 @@ Tap the right Command key on its own and Tobi puts short labels on the clickable
 screen: buttons, links, text fields, menu items, tabs and so on. Type a label and Tobi
 clicks that element. You don't need the mouse or trackpad.
 
-> **Status: early release (0.1.0).** Tobi has been tested on one Mac with one display. If you
-> run into a problem, please [open an issue](https://github.com/hatohato25/tobi/issues).
+> **Status: early release (0.1.1).** Tobi has been tested on macOS 26 and 27 only. If you run
+> into a problem, please [open an issue](https://github.com/hatohato25/tobi/issues).
 
 ## Requirements
 
-- **macOS 27 or later.** Older versions of macOS are not supported.
+- **macOS 15 or later.** Older versions of macOS are not supported.
 - Accessibility permission (see [Permissions](#permissions)).
 
 ## Installation
@@ -112,21 +112,22 @@ English otherwise.
     available. They stay in this state until you quit them, which can use more CPU and memory.
     Right after an app starts, labels might not appear on its content yet. Terminals in these
     apps get labels for the whole terminal area and its tabs, not for each piece of text.
-  - **Chrome** doesn't. Only the window frame, tabs and toolbar get labels, not the content
-    inside. Support may come after the MVP.
+  - **Chromium browsers (such as Chrome, Edge and Brave):** Tobi asks these browsers to make
+    their content available in the same way. This setting can affect window management tools
+    while the browser is running.
 - **Apps that draw their own UI:** Some apps, such as WezTerm and many games, draw their
   whole window themselves (for example with Metal) instead of using standard macOS controls.
   They don't make their contents available to accessibility tools, so only the window frame
   gets labels.
-- **Multiple displays:** Labels have been tested on a single display only. Tobi hasn't been
-  tested yet with multiple displays, a mix of Retina and non-Retina displays, or the
-  "Displays have separate Spaces" setting.
+- **Multiple displays:** Tobi has been tested with two displays. It hasn't been tested with
+  a mix of Retina and non-Retina displays, or with the "Displays have separate Spaces" setting
+  turned off.
 
 ## Building from source
 
 For developers. You need:
 
-- macOS 27 or later, with an Xcode that includes the macOS 27 SDK and Swift 6.
+- macOS 26 or later, with Xcode 27 or later.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) and
   [SwiftLint](https://github.com/realm/SwiftLint). For example:
   `brew install xcodegen swiftlint`.

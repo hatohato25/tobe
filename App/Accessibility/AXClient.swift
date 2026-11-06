@@ -80,7 +80,7 @@ struct AXClient: Sendable {
         try Self.check(AXUIElementPerformAction(element.raw, kAXPressAction as CFString))
     }
 
-    /// `AXUIElementSetAttributeValue` で、真偽値の属性を設定する（`ElectronAccessibilityEnabler`）。
+    /// `AXUIElementSetAttributeValue` で、真偽値の属性を設定する（`ContentAccessibilityEnabler`）。
     func setAttribute(_ attribute: String, to value: Bool, of element: AXElementRef) throws(AccessibilityReadError) {
         try Self.check(AXUIElementSetAttributeValue(element.raw, attribute as CFString, value as CFBoolean))
     }

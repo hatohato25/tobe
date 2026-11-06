@@ -53,7 +53,7 @@ final class HintModeModule: AppModule {
 
     private var tapEventsTask: Task<Void, Never>?
     private var screenChangesTask: Task<Void, Never>?
-    private let electronEnabler = ElectronAccessibilityEnabler()
+    private let contentEnabler = ContentAccessibilityEnabler()
     private var activationObserver: NSObjectProtocol?
 
     init(hotkey: HotkeyModule) {
@@ -63,7 +63,7 @@ final class HintModeModule: AppModule {
         self.screens = screens
         self.registry = registry
         overlay = OverlayController(screens: screens.currentSnapshots())
-        collector = AXElementCollector(registry: registry, electronEnabler: electronEnabler)
+        collector = AXElementCollector(registry: registry, contentEnabler: contentEnabler)
         let poster = MouseClickPoster()
         performer = AXActionPerformer(
             client: AXClient(),
@@ -91,13 +91,13 @@ final class HintModeModule: AppModule {
                 self?.screensDidChange()
             }
         }
-        startEnablingElectronApps()
+        startEnablingContentExposure()
         Log.app.notice("HintModeModule を開始した")
     }
 
-    /// 前面のアプリが Electron なら、ラベルを出す前に中身の公開を頼んでおく。公開に数秒かかるので、最初のタップに間に合わせるため。
-    private func startEnablingElectronApps() {
-        let enabler = electronEnabler
+    /// 前面のアプリが対象なら、ラベルを出す前に中身の公開を頼んでおく。公開に数秒かかるので、最初のタップに間に合わせるため。
+    private func startEnablingContentExposure() {
+        let enabler = contentEnabler
         let enable: @Sendable (NSRunningApplication?) -> Void = { app in
             guard let pid = app?.processIdentifier else { return }
             let processID = ProcessID(rawValue: pid)
