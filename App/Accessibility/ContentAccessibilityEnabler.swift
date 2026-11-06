@@ -37,6 +37,12 @@ final class ContentAccessibilityEnabler: Sendable {
             Log.collector.notice(
                 "中身の公開を頼んだ: pid \(pid.rawValue, privacy: .public)、\(kind.rawValue, privacy: .public)"
             )
+        } catch .notImplemented {
+            // Chromium は設定を受け取って中身を公開するが、結果にはこのエラーを返す（Chrome と Brave の実機で確認）。
+            // 失敗として扱わない
+            Log.collector.notice(
+                "中身の公開を頼んだ（notImplemented）: pid \(pid.rawValue, privacy: .public)、\(kind.rawValue, privacy: .public)"
+            )
         } catch .cannotComplete {
             guard retriesLeft > 0 else {
                 // 次の収集か、次に前面に来たときに頼み直す
