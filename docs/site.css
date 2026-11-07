@@ -191,7 +191,7 @@ kbd {
 
 /* ---- Demo ---- */
 .demo {
-  width: min(1440px, calc(100vw - 32px));
+  width: var(--page);
   margin: 0 auto;
 }
 
@@ -205,8 +205,7 @@ kbd {
 }
 
 .demo figcaption {
-  width: var(--page);
-  margin: 16px auto 0;
+  margin-top: 16px;
   color: var(--muted);
   font-size: 15px;
 }
