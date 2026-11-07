@@ -1,3 +1,4 @@
+import ApplicationServices
 import Dispatch
 import TobeCore
 
@@ -22,7 +23,9 @@ import TobeCore
 ///   （`AXTextField`）は、`AXActionNames` に `AXPress` がないのに `AXPress` へ `success` を返し、何もしない。
 ///   そのため `actionUnsupported` を待つだけでは代替クリックに切り替わらない（V-4 では Safari のアドレス欄が
 ///   正しく `actionUnsupported` を返していたので、この場合を見落としていた）。増える IPC は確定時の 1 回だけ。
-/// - 対象アプリのアクティブ化やウィンドウを前面に出す処理はしない（暫定 Q-18）。
+/// - 手順 1 の次に、対象のアプリとウィンドウを前面に出す（Q-18、D-34。`bringToFront`）。`AXPress` はアプリを前面に
+///   出さないので、後ろのウィンドウのラベルを選んでも後ろのままになるため。失敗してもログに残してクリックは続ける
+///   （押したい要素は確定しており、前面に出せないことでクリックまで失わないため）。
 ///
 /// スレッド: `AXPress` はモーダルダイアログを開くと相手のアプリが応答するまでブロックするため、
 /// MainActor でも Swift Concurrency の協調スレッドプールでもなく、GCD のグローバルキューで実行する（design.md 13 章）。
@@ -83,6 +86,7 @@ struct AXActionPerformer: ActionPerforming {
         guard let reference = lookUpElement(element.id) else {
             throw .elementNotFound(element.id)
         }
+        bringToFront(reference, role: element.role)
         if TraversalPolicy.ambiguousRoles.contains(element.role) {
             guard let fallbackClick else { throw .actionUnsupported }
             Log.action.debug("汎用のロールのため代替クリックにする。ロール: \(element.role, privacy: .public)")
@@ -110,6 +114,61 @@ struct AXActionPerformer: ActionPerforming {
                 "AXPress に非対応のため代替クリックにする。ロール: \(element.role, privacy: .public)")
             try fallbackClick(element.frame)
             return .mouseClick
+        }
+    }
+
+    /// 前面に出す処理をしないロール。メニューは前面のアプリのものだけにラベルが付くので前面に出す必要がなく、
+    /// 前面に出す処理で開いているメニューを閉じてしまうおそれがある。
+    private static let menuRoles: Set<String> = [kAXMenuItemRole, kAXMenuBarItemRole]
+
+    /// 要素のアプリを前面のアプリにし、要素のウィンドウを最前面に上げる（Q-18、D-34）。
+    ///
+    /// すでに前面のアプリの最前面のウィンドウなら何も変えない（開いているポップオーバーなどを閉じないため）。
+    /// 失敗はログに残すだけで投げない（型の説明を参照）。
+    private func bringToFront(_ reference: AXElementRef, role: String) {
+        guard !Self.menuRoles.contains(role) else { return }
+        do throws(AccessibilityReadError) {
+            let app = AXElementRef.application(pid: try client.pid(of: reference))
+            try client.setMessagingTimeout(AXClient.pressMessagingTimeout, for: app)
+            if try !isTrue(kAXFrontmostAttribute, of: app) {
+                try client.setAttribute(kAXFrontmostAttribute, to: true, of: app)
+            }
+        } catch {
+            Log.action.notice(
+                "アプリを前面に出せなかった: \(String(describing: error), privacy: .public) \(role, privacy: .public)")
+        }
+        do throws(AccessibilityReadError) {
+            try client.setMessagingTimeout(AXClient.pressMessagingTimeout, for: reference)
+            let value = try client.attributeValue(kAXWindowAttribute, of: reference)
+            guard CFGetTypeID(value) == AXUIElementGetTypeID() else {
+                Log.action.error("AXWindow の値が要素ではない: \(role, privacy: .public)")
+                return
+            }
+            let window = AXElementRef(raw: unsafeDowncast(value, to: AXUIElement.self))
+            try client.setMessagingTimeout(AXClient.pressMessagingTimeout, for: window)
+            guard try !isTrue(kAXMainAttribute, of: window) else { return }
+            try client.setAttribute(kAXMainAttribute, to: true, of: window)
+            try client.raise(window)
+        } catch {
+            Log.action.notice(
+                "ウィンドウを前面に出せなかった: \(String(describing: error), privacy: .public) \(role, privacy: .public)")
+        }
+    }
+
+    /// 真偽値の属性が `true` か。属性がない・型が違うときは `false`（前面に出す処理を省かない側に倒す）。
+    private func isTrue(_ attribute: String, of element: AXElementRef) throws(AccessibilityReadError) -> Bool {
+        let value: CFTypeRef
+        do throws(AccessibilityReadError) {
+            value = try client.attributeValue(attribute, of: element)
+        } catch .attributeUnsupported {
+            return false
+        }
+        do throws(AXValueDecodingError) {
+            return try AXValueDecoder.bool(value)
+        } catch {
+            Log.action.notice(
+                "\(attribute, privacy: .public) を解釈できなかった: \(String(describing: error), privacy: .public)")
+            return false
         }
     }
 

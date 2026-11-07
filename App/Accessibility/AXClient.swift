@@ -70,6 +70,13 @@ struct AXClient: Sendable {
         return names
     }
 
+    /// `AXUIElementGetPid` で、要素を所有するアプリの PID を読む（IPC なし）。
+    func pid(of element: AXElementRef) throws(AccessibilityReadError) -> pid_t {
+        var pid: pid_t = 0
+        try Self.check(AXUIElementGetPid(element.raw, &pid))
+        return pid
+    }
+
     // MARK: - 操作
 
     /// その参照にタイムアウト 1.0 秒を設定してから `AXPress` する（design.md 10 章、D-29）。
@@ -78,6 +85,11 @@ struct AXClient: Sendable {
     func press(_ element: AXElementRef) throws(AccessibilityReadError) {
         try setMessagingTimeout(Self.pressMessagingTimeout, for: element)
         try Self.check(AXUIElementPerformAction(element.raw, kAXPressAction as CFString))
+    }
+
+    /// `AXRaise` で、ウィンドウをアプリの中の最前面に上げる（D-34）。タイムアウトは呼び出し側が設定する。
+    func raise(_ window: AXElementRef) throws(AccessibilityReadError) {
+        try Self.check(AXUIElementPerformAction(window.raw, kAXRaiseAction as CFString))
     }
 
     /// `AXUIElementSetAttributeValue` で、真偽値の属性を設定する（`ContentAccessibilityEnabler`）。

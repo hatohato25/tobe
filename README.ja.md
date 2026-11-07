@@ -8,7 +8,7 @@ Tobe は、[Vimium](https://github.com/philc/vimium) のヒントモードを ma
 
 ![Safari、VS Code、システム設定のクリックできる要素に Tobe がラベルを付け、入力したラベルの要素をクリックする様子](docs/demo.gif)
 
-> **現在の状態: 初期リリース（0.2.2）。** 動作を確認している OS は macOS 26 と 27 だけです。問題が起きたら [Issue](https://github.com/hatohato25/tobe/issues) でお知らせください。
+> **現在の状態: 初期リリース（0.2.3）。** 動作を確認している OS は macOS 26 と 27 だけです。問題が起きたら [Issue](https://github.com/hatohato25/tobe/issues) でお知らせください。
 
 ## 動作環境
 

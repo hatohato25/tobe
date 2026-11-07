@@ -11,7 +11,7 @@ clicks that element. You don't need the mouse or trackpad.
 
 ![Tobe labels the clickable elements in Safari, VS Code and System Settings, and clicks the one you type](docs/demo.gif)
 
-> **Status: early release (0.2.2).** Tobe has been tested on macOS 26 and 27 only. If you run
+> **Status: early release (0.2.3).** Tobe has been tested on macOS 26 and 27 only. If you run
 > into a problem, please [open an issue](https://github.com/hatohato25/tobe/issues).
 
 ## Requirements
