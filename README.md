@@ -9,6 +9,8 @@ Tap the right Command key on its own and Tobe puts short labels on the clickable
 screen: buttons, links, text fields, menu items, tabs and so on. Type a label and Tobe
 clicks that element. You don't need the mouse or trackpad.
 
+![Tobe labels the clickable elements in Safari, VS Code and System Settings, and clicks the one you type](docs/demo.gif)
+
 > **Status: early release (0.2.2).** Tobe has been tested on macOS 26 and 27 only. If you run
 > into a problem, please [open an issue](https://github.com/hatohato25/tobe/issues).
 
