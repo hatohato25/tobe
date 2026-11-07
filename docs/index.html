@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tobe — Keyboard-driven hint mode for every macOS app</title>
+  <meta name="description" content="Tap the right Command key, type a short label, and Tobe clicks that element. Vimium's hint mode for all of macOS. Free and open source.">
+  <link rel="canonical" href="https://hatohato25.github.io/tobe/">
+  <link rel="alternate" hreflang="en" href="https://hatohato25.github.io/tobe/">
+  <link rel="alternate" hreflang="ja" href="https://hatohato25.github.io/tobe/ja/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Tobe — Keyboard-driven hint mode for every macOS app">
+  <meta property="og:description" content="Tap the right Command key, type a short label, and Tobe clicks that element.">
+  <meta property="og:url" content="https://hatohato25.github.io/tobe/">
+  <meta property="og:image" content="https://hatohato25.github.io/tobe/icon-256.png">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/png" href="icon-64.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700..800&family=Instrument+Sans:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <header class="wrap nav">
+    <a class="brand" href="./"><img src="icon-64.png" width="32" height="32" alt="">Tobe</a>
+    <nav class="nav-links" aria-label="Site">
+      <span aria-current="page">English</span>
+      <a href="ja/" hreflang="ja" lang="ja">日本語</a>
+      <a href="https://github.com/hatohato25/tobe">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="wrap hero">
+      <div class="hero-text">
+        <p class="eyebrow">飛べ — “Jump!”, or just “to be”</p>
+        <h1>
+          <span class="line">Tap <span class="cap cap-dark">⌘</span>.</span>
+          <span class="line">Type a <span class="cap">label</span>.</span>
+          <span class="line">Clicked.</span>
+        </h1>
+        <p class="lede">Tobe brings the hint mode of Vimium to all of macOS. Buttons, links, text fields, menu items and tabs get short labels. Type one and Tobe clicks it. You don't need the mouse or trackpad.</p>
+        <div class="actions">
+          <a class="button button-primary" href="#install">Install with Homebrew</a>
+          <button class="button try" type="button" data-try>Try it on this page</button>
+        </div>
+        <p class="tap-hint">Or tap the right <kbd>⌘</kbd> key now. This page has a small hint mode of its own.</p>
+      </div>
+      <div class="mark" aria-hidden="true">
+        <img src="icon-256.png" width="248" height="248" alt="">
+        <span class="pop">A</span>
+        <span class="pop">SA</span>
+        <span class="pop">D</span>
+        <span class="pop">SD</span>
+      </div>
+    </div>
+
+    <figure class="demo" style="margin-block: 0">
+      <img src="demo.gif" width="1720" height="720" alt="Tobe labels the clickable elements in Safari, VS Code and System Settings, and clicks the one you type">
+      <figcaption>Safari, VS Code and System Settings on one screen.</figcaption>
+    </figure>
+
+    <section class="wrap" aria-labelledby="how">
+      <h2 id="how">Three keystrokes, more or less</h2>
+      <ol class="steps">
+        <li>
+          <div class="step-visual" aria-hidden="true"><span class="cap cap-dark">right ⌘</span></div>
+          <div>
+            <h3>Tap the trigger key</h3>
+            <p>Press and release it within 300 ms, on its own. Shortcuts such as ⌘C still work as usual.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-visual" aria-hidden="true"><span class="cap">SA</span><span class="cap">DF</span><span class="cap">JK</span></div>
+          <div>
+            <h3>Type a label</h3>
+            <p>Labels that don't match are hidden. Keys go only to Tobe, so typing never inserts text into a text field. Case doesn't matter.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-visual" aria-hidden="true"><span class="cap"><span class="typed">S</span>A</span><span>→ click</span></div>
+          <div>
+            <h3>Tobe clicks</h3>
+            <p>No label is the start of another, so Tobe clicks as soon as one label matches. <kbd>Backspace</kbd> deletes a character and <kbd>Esc</kbd> cancels.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <section class="wrap" aria-labelledby="details">
+      <h2 id="details">Good to know</h2>
+      <div class="columns">
+        <div>
+          <h3>What you get</h3>
+          <ul class="plain-list">
+            <li><strong>One permission</strong>Accessibility only. Input Monitoring is not needed.</li>
+            <li><strong>Web content too</strong>Safari, Electron apps such as VS Code, and Chromium browsers such as Chrome.</li>
+            <li><strong>Your settings</strong>Trigger key (right ⌘ or right ⌥), label characters, label font size and colors, and opening at login.</li>
+            <li><strong>Open source</strong>MIT license, on GitHub.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Where it falls short</h3>
+          <ul class="plain-list">
+            <li><strong>Apps that draw their own UI</strong>In WezTerm and many games, only the window frame gets labels.</li>
+            <li><strong>Secure Input</strong>In password fields, for example, macOS doesn't send keystrokes to Tobe, so hint mode might not start.</li>
+            <li><strong>Electron and Chromium apps</strong>Tobe asks them to make their content available, which can use more CPU and memory. In Chromium browsers it can affect window management tools.</li>
+            <li><strong>Early release</strong>Tested on macOS 26 and 27 only. <a href="https://github.com/hatohato25/tobe#known-limitations">See all known limitations</a>.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="wrap" id="install" aria-labelledby="install-title">
+      <h2 id="install-title">Install</h2>
+      <div class="install">
+        <div>
+          <h3>Homebrew</h3>
+          <p>Homebrew doesn't load casks from non-official taps until you trust them, so trust the Tobe cask first.</p>
+          <div class="copy-block">
+            <pre class="command"><code>brew trust --cask hatohato25/tobe/tobe
+brew install --cask hatohato25/tobe/tobe</code></pre>
+            <button class="copy" type="button" data-done="Copied" data-failed="Failed">Copy</button>
+          </div>
+          <h3>First launch</h3>
+          <p>Gatekeeper blocks Tobe the first time you open it. Remove the quarantine attribute, or click <strong>Open Anyway</strong> in System Settings &gt; Privacy &amp; Security.</p>
+          <div class="copy-block">
+            <pre class="command"><code>xattr -dr com.apple.quarantine /Applications/Tobe.app</code></pre>
+            <button class="copy" type="button" data-done="Copied" data-failed="Failed">Copy</button>
+          </div>
+        </div>
+        <aside class="note">
+          <h3>Tobe is not notarized</h3>
+          <p>It's signed with a self-signed certificate, not notarized by Apple. That's why the steps above are needed.</p>
+          <p>Requires <strong>macOS 15 or later</strong>. Downloads are on <a href="https://github.com/hatohato25/tobe/releases">GitHub Releases</a>, and the README shows <a href="https://github.com/hatohato25/tobe#verifying-the-download">how to verify them</a>.</p>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <span>Tobe is released under the MIT License. Hint mode comes from <a href="https://github.com/philc/vimium">Vimium</a>.</span>
+    <a href="https://github.com/hatohato25/tobe/issues">Report an issue</a>
+  </footer>
+
+  <div class="hint-status" role="status" hidden>Type a label. <kbd>Esc</kbd> cancels.</div>
+  <script src="site.js"></script>
+</body>
+</html>
