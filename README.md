@@ -21,9 +21,11 @@ clicks that element. You don't need the mouse or trackpad.
 
 ## Installation
 
-Install Tobe from its Homebrew tap:
+Install Tobe from its Homebrew tap. Homebrew doesn't load casks from non-official taps until
+you trust them, so trust the Tobe cask first:
 
 ```sh
+brew trust --cask hatohato25/tobe/tobe
 brew install --cask hatohato25/tobe/tobe
 ```
 

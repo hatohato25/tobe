@@ -17,9 +17,10 @@ Tobe は、[Vimium](https://github.com/philc/vimium) のヒントモードを ma
 
 ## インストール
 
-Homebrew の tap からインストールします。
+Homebrew の tap からインストールします。Homebrew は公式以外の tap の Cask を、信頼するまで読み込まないので、先に Tobe の Cask を信頼します。
 
 ```sh
+brew trust --cask hatohato25/tobe/tobe
 brew install --cask hatohato25/tobe/tobe
 ```
 
