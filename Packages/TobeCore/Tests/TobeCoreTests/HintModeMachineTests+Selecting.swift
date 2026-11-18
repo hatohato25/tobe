@@ -177,15 +177,15 @@ struct HintModeMachineSelectingOtherTests {
         #expect(effects == [.hideHints, .setKeySuppression(false)])
     }
 
-    @Test("triggerTapped → selecting のまま、エフェクトなし（Q-3）")
-    func retriggerIsIgnored() throws {
+    @Test("triggerTapped → idle。Esc と同じく hideHints → setKeySuppression(false)（Q-3、F-6.7）")
+    func retriggerHides() throws {
         var machine = try HintModeFixtures.selecting(elementCount: 6, alphabet: try HintModeFixtures.sadf())
-        let before = machine.state
+        _ = machine.send(.key(.character("s")))  // 入力の途中でも終える
 
         let effects = machine.send(.triggerTapped(alphabet: .vimiumDefault))
 
-        #expect(effects.isEmpty)
-        #expect(machine.state == before)
+        #expect(machine.state == .idle)
+        #expect(effects == [.hideHints, .setKeySuppression(false)])
     }
 
     @Test("collectionSucceeded / Failed（古い結果。同じ id でも）→ selecting のまま、エフェクトなし")

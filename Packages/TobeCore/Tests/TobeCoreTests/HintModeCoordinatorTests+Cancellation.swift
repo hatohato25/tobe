@@ -7,6 +7,8 @@ enum CollectionInterruption: String, CaseIterable, Sendable {
     case escape
     case pointerDown
     case screensChanged
+    /// 起動キーの再タップ（Q-3、F-6.7）。
+    case retrigger
 
     @MainActor
     func send(to coordinator: HintModeCoordinator) {
@@ -14,6 +16,7 @@ enum CollectionInterruption: String, CaseIterable, Sendable {
         case .escape: coordinator.keyPressed(.escape)
         case .pointerDown: coordinator.pointerDown()
         case .screensChanged: coordinator.screensChanged()
+        case .retrigger: coordinator.triggerTapped()
         }
     }
 }
@@ -79,18 +82,32 @@ struct HintModeCoordinatorCancellationTests {
         #expect(harness.logEvents == [.collectionFailed(SessionID(rawValue: 1), .cancelled, elapsed: .zero)])
     }
 
-    @Test("収集中の再タップは無視し、収集を続ける（暫定 Q-3）")
-    func retapWhileCollectingIsIgnored() async {
+    @Test("収集中の再タップで終えた後、もう一度タップすると新しいセッションを始める（Q-3、F-6.7）")
+    func retapWhileCollectingThenRestart() async {
         let harness = CoordinatorHarness()
         harness.coordinator.triggerTapped()
         await harness.collector.waitUntilWaiting(count: 1)
 
         harness.coordinator.triggerTapped()
+        #expect(harness.coordinator.state == .idle)
+        #expect(harness.collector.cancelledCallCount == 1)
+
+        harness.coordinator.triggerTapped()
+        await harness.collector.waitUntilWaiting(count: 2)
+        #expect(harness.sessionID == SessionID(rawValue: 2))
+
+        // 1 回目（取り消した）の収集から先に返る。こちらは捨て、2 回目の結果だけを表示する
+        harness.collector.respond(with: .success(HintModeFixtures.result(elementCount: 5)))
         harness.collector.respond(with: .success(HintModeFixtures.result(elementCount: 2)))
         await harness.coordinator.waitForPendingWork()
 
-        #expect(harness.collector.deadlines.count == 1)
+        #expect(harness.collector.deadlines.count == 2)
         #expect(harness.overlay.shown.map(\.placements.count) == [2])
+        #expect(
+            harness.entries.prefix(5) == [
+                .setSuppressing(true), .collect, .setSuppressing(false), .setSuppressing(true), .collect,
+            ]
+        )
     }
 }
 
@@ -203,8 +220,8 @@ struct HintModeCoordinatorSettingsTests {
         await harness.collector.waitUntilWaiting(count: 1)
 
         harness.settings = settings(alphabet: .vimiumDefault, appearance: Self.largeAppearance)
-        // 収集中の再タップ（無視される）でも、見た目は差し替えない
-        harness.coordinator.triggerTapped()
+        // 収集中に届いたキー（破棄される）でも、設定は読み直さない
+        harness.coordinator.keyPressed(.character("a"))
         harness.collector.respond(with: .success(HintModeFixtures.result(elementCount: 6)))
         await harness.coordinator.waitForPendingWork()
 

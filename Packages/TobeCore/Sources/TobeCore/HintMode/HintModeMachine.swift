@@ -52,14 +52,12 @@ public struct HintModeMachine: Sendable {
             // 失敗の理由のログは Coordinator が出す（イベントの値を持っているため）
             state = .idle
             return [.setKeySuppression(false), .playFailure]
-        case .key(.escape), .pointerDown, .screensChanged:
+        case .key(.escape), .pointerDown, .screensChanged, .triggerTapped:
+            // 起動キーの再タップも Esc と同じく終える（Q-3、D-35）
             state = .idle
             return [.cancelCollection(context.sessionID), .setKeySuppression(false)]
         case .key:
             // 収集中の Esc 以外のキーは破棄するだけ（暫定 Q-4）
-            return []
-        case .triggerTapped:
-            // 収集中の再タップは無視する（暫定 Q-3）
             return []
         }
     }
@@ -94,13 +92,11 @@ public struct HintModeMachine: Sendable {
             return selectCharacter(character, context: context)
         case .key(.backspace):
             return deleteLastCharacter(context: context)
-        case .key(.escape), .pointerDown, .screensChanged:
+        case .key(.escape), .pointerDown, .screensChanged, .triggerTapped:
+            // 起動キーの再タップも Esc と同じく終える（Q-3、D-35）
             state = .idle
             return [.hideHints, .setKeySuppression(false)]
         case .key(.ignored):
-            return []
-        case .triggerTapped:
-            // ラベル入力中の再タップは無視する（暫定 Q-3）
             return []
         case .collectionSucceeded, .collectionFailed:
             // 収集はラベルの表示前に終わっているので、ここに届くのは古い結果だけ

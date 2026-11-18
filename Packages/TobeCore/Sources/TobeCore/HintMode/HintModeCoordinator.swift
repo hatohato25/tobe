@@ -95,11 +95,12 @@ public final class HintModeCoordinator {
 
     // MARK: - 入力
 
-    /// 起動キーの単独タップ（F-1）。
+    /// 起動キーの単独タップ（F-1）。ヒントモード中なら Esc と同じくヒントモードを終える（F-6.7、Q-3）。
     public func triggerTapped() {
         let current = settings()
         let effects = machine.send(.triggerTapped(alphabet: current.alphabet))
-        // 再タップ（暫定 Q-3）はマシンが無視するので、見た目を差し替えるのは新しいセッションが始まったときだけ
+        // ヒントモード中の再タップ（Q-3）はセッションを終えるだけで startCollection を出さない。
+        // 見た目を差し替えるのは新しいセッションが始まったときだけ（S-0.4）
         if effects.contains(where: Self.isStartCollection) {
             sessionAppearance = current.appearance
         }

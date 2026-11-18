@@ -85,6 +85,7 @@ screen in System Settings.
 3. **Correct or cancel:**
    - **Backspace** deletes the last character you typed.
    - **Esc** leaves hint mode without clicking. This works even if you hold ⌘, ⌃ or ⌥.
+   - Tapping the **right Command (⌘)** key again also leaves hint mode without clicking.
 
 While hint mode is on, the keys you type go only to Tobe. The app you're using doesn't
 receive them, so typing a label never inserts text into a text field.

@@ -183,6 +183,23 @@ struct HintModeCoordinatorFlowTests {
         #expect(harness.coordinator.state == .idle)
     }
 
+    @Test("ラベル入力中の再タップは Esc と同じくラベルを消し、キー破棄を解く。次のタップで再表示する（Q-3、F-6.7）")
+    func retapWhileSelectingToggles() async {
+        let harness = CoordinatorHarness()
+        let before = await harness.startSelecting(with: HintModeFixtures.result(elementCount: 3))
+
+        harness.coordinator.triggerTapped()
+
+        #expect(Array(harness.entries.dropFirst(before)) == [.hide, .setSuppressing(false)])
+        #expect(harness.coordinator.state == .idle)
+        #expect(harness.collector.cancelledCallCount == 0)
+
+        await harness.startSelecting(with: HintModeFixtures.result(elementCount: 4))
+
+        #expect(harness.sessionID == SessionID(rawValue: 2))
+        #expect(harness.overlay.shown.map(\.placements.count) == [3, 4])
+    }
+
     @Test("操作の終わりを待たずに、次の単独タップで新しいセッションを始める（F-5.5）")
     func nextTriggerAfterConfirmation() async throws {
         let harness = CoordinatorHarness()

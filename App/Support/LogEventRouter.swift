@@ -58,7 +58,7 @@ enum LogEventRouter {
     private static func routeCollectionFailure(session: SessionID, error: CollectionError, elapsed: Duration) {
         switch error {
         case .cancelled:
-            // Esc・マウスの押下・画面の構成の変化で止めた収集。異常ではない（F-6.2）
+            // Esc・起動キーの再タップ・マウスの押下・画面の構成の変化で止めた収集。異常ではない（F-6.2）
             Log.collector.info(
                 """
                 セッション \(session.rawValue, privacy: .public): 収集を取り消した\

@@ -177,7 +177,8 @@ final class HintModeModule: AppModule {
             // N-1.1 の計測の起点。Coordinator に渡す前に始める
             sessionSignpost = Signposts.beginHintSession()
         }
-        // ヒントモード中の再タップ（暫定 Q-3）は Coordinator が無視する。区間は始め直さない
+        // ヒントモード中の再タップ（Q-3）は Esc と同じくセッションを終える。区間は始め直さず、下で閉じる。
+        // 確定ではないので pendingActionCount は増やさない
         coordinator.triggerTapped()
         finishSessionIfIdle()
     }

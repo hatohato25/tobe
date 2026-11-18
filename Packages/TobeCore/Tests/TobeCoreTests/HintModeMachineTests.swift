@@ -289,15 +289,28 @@ struct HintModeMachineCollectingTests {
         #expect(effects == [.cancelCollection(sessionID), .setKeySuppression(false)])
     }
 
-    @Test("triggerTapped → collecting のまま、エフェクトなし（Q-3）")
-    func retriggerIsIgnored() throws {
-        var (machine, _) = try HintModeFixtures.collecting()
-        let before = machine.state
+    @Test("triggerTapped → idle。Esc と同じく収集をやめてからキー破棄を解く（Q-3、F-6.7）")
+    func retriggerCancels() throws {
+        var (machine, sessionID) = try HintModeFixtures.collecting()
 
         let effects = machine.send(.triggerTapped(alphabet: try HintModeFixtures.sadf()))
 
-        #expect(effects.isEmpty)
-        #expect(machine.state == before)
+        #expect(machine.state == .idle)
+        #expect(effects == [.cancelCollection(sessionID), .setKeySuppression(false)])
+    }
+
+    @Test("再タップで終えた後の結果は捨て、次のタップで新しいセッションを始める（Q-3、F-6.7）")
+    func retriggerThenTriggerStartsNewSession() throws {
+        var (machine, sessionID) = try HintModeFixtures.collecting()
+        _ = machine.send(.triggerTapped(alphabet: .vimiumDefault))
+
+        let late = machine.send(.collectionSucceeded(sessionID, HintModeFixtures.result(elementCount: 3)))
+        let restart = machine.send(.triggerTapped(alphabet: .vimiumDefault))
+
+        #expect(late.isEmpty)
+        let next = SessionID(rawValue: sessionID.rawValue + 1)
+        #expect(restart == [.setKeySuppression(true), .startCollection(next)])
+        #expect(machine.state == .collecting(CollectingContext(sessionID: next, alphabet: .vimiumDefault)))
     }
 }
 
